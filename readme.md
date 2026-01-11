@@ -1,10 +1,36 @@
-# Root Layout & Constants
+# Header & Footer Component
 
-In Next.js we can have groups and multiple layouts. Groups are folders that are not pages and are used for structure. You can create a group by creating a folder with parenrentheses around the name.
+Let's start to work on the main components of our website. We will start with the header component.
 
-Create a folder called `(root)` in the `app` folder. Move the `app/page.tsx` into the `(root)` folder. We are also going to have a sub layout here. Instead of adding the container classes and embedding our header, footer and things like that in the main layout, we will do that here.
+The way we are going to structure our component files will be a bit different than I usually do. If the component will include multiple embedded components, we will have them in a folder inside of a folder called shared. For instance, the header will consist of not only the header component, but other ahared components such as the mode toggle.
 
-Add the following code to the `(root)/layout.tsx` file:
+Create a folder at `components/shared/header`. For the main header component, the file will be called `index.tsx`. So we are doing this in a Next.js-like way. Like the pages and routes.
+
+It's important to mention that you can structure your components in any way you like. This is just the way I want to do it.
+
+Create a file at `components/shared/header/index.tsx` and add the following code:
+
+```tsx
+const Header = () => {
+  return <>Header</>;
+};
+
+export default Header;
+```
+
+## Embedding the Header Component
+
+We are going to embed the header in our root group layout file (`app/(root)/layout.tsx`). Not the main layout file (`app/layout.tsx`).
+
+Open the `app/(root)/layout.tsx` file and add the following import:
+
+```tsx
+import Header from "@/components/shared/header";
+```
+
+Since the file is called `index.tsx`, we don't need to specify the file name when importing it.
+
+Now embed it:
 
 ```tsx
 export default function RootLayout({
@@ -13,98 +39,118 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='flex h-screen flex-col'>
-      <main className='flex-1 wrapper'>{children}</main>
+    <div className="flex h-screen flex-col">
+      <Header />
+      <main className="flex-1 wrapper">{children}</main>
     </div>
   );
 }
 ```
 
-It is very similar to the main layout except we added some container classes. We will add the header and footer components here.
+Now we can see the text `Header` on the page.
 
-Your main `app/layout.tsx` file should look like this:
+Hint: If you want to import something that is not imported, you can press `Ctrl + .` and select to import it.
+
+Add the following to the `Header` component:
 
 ```tsx
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import '@/assets/styles/globals.css';
+import { ShoppingCart, UserIcon } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 
-const inter = Inter({ subsets: ['latin'] });
+import { Button } from "@/components/ui/button";
+import { APP_NAME } from "@/lib/constants";
 
-export const metadata: Metadata = {
-  title: 'Prostore',
-  description: 'A modern store built with Next.js',
+const Header = () => {
+  return (
+    <header className="w-full border-b">
+      <div className="wrapper flex-between">
+        <div className="flex-start">
+          <Link href="/" className="flex-start">
+            <Image
+              priority={true}
+              src="/images/logo.svg"
+              width={48}
+              height={48}
+              alt={`${APP_NAME} logo`}
+            />
+            <span className="hidden lg:block font-bold text-2xl ml-3">
+              {APP_NAME}
+            </span>
+          </Link>
+        </div>
+        <div className="space-x-2">
+          <Button asChild variant="ghost">
+            <Link href="/cart">
+              <ShoppingCart />
+              Cart
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/sign-in">
+              <UserIcon />
+              Sign In
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </header>
+  );
 };
 
+export default Header;
+```
+
+We are bringing in the `ShoppingCart` and `UserIcon` from the `lucide-react` library. We are also using the `Button` component from the `@/components/ui/button` file. We are using the `Link` component from `next/link` to create a link to the `/cart` page. We are also using the `APP_NAME` constant from the `@/lib/constants` file.
+
+The logo will have the app name on larger screens and on smaller screens it will be hidden.
+
+We are using the `ghost` variant of the `Button` component. This is because we want the button to have a transparent background. We are also using the `asChild` prop to make the button a child of the `Link` component. This is because we want the button to be a child of the `Link` component.
+
+## Footer Component
+
+Create a file at `components/footer.tsx` and add the following code:
+
+```tsx
+import { APP_NAME } from "@/lib/constants";
+
+const Footer = () => {
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <footer className="border-t">
+      <div className="p-5 flex-center">
+        {currentYear} {APP_NAME}. All Rights reserved.
+      </div>
+    </footer>
+  );
+};
+
+export default Footer;
+```
+
+Bring the footer into the `app/(root)/layout.tsx` file.
+
+```tsx
+import Footer from "@/components/footer";
+```
+
+Now embed it:
+
+```tsx
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='en' suppressHydrationWarning>
-      <body className={`${inter.className}`}>{children}</body>
-    </html>
+    <div className="flex h-screen flex-col">
+      <Header />
+      <main className="flex-1 wrapper">{children}</main>
+      <Footer />
+    </div>
   );
 }
 ```
 
-So that only the `{children}` prop is rendered in the `<body>` tag. No classes or anything.
-
-This will give us a more flexible layout. When we create our header and stuff, the will go in the `(root)/layout.tsx` file. Now if we want to have multiple layoutss, we can create a new group and add the layout there.
-
-## Constants
-
-Another thing I want to do in this lesson is create a file to store some constants and info that we will use throughout the course. Create a file at `lib/constants/index.ts` and add the following code:
-
-```ts
-export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || 'Prostore';
-export const APP_DESCRIPTION =
-  process.env.NEXT_PUBLIC_APP_DESCRIPTION ||
-  'A modern store built with Next.js';
-export const SERVER_URL =
-  process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000';
-```
-
-We will add to this file as we go. The purpose of this file is so that we can use these values in multiple places without having to repeat ourselves. In this case, we are using the `process.env` object to get the values from the `.env` file and creating a default value if the environment variable is not set.
-
-## `.env` File
-
-Even though we have the defaults in the constants file, I stil want to set the environment variables in the `.env` file.
-
-Create a file called `.env` in the root of the project and add the following values:
-
-```env
-NEXT_PUBLIC_APP_NAME="Prostore"
-NEXT_PUBLIC_APP_DESCRIPTION="Prostore is a modern e-commerce platform for selling digital products"
-NEXT_PUBLIC_SERVER_URL="http://localhost:3000"
-```
-
-Add the `.env` file to your `.gitignore` file as well. You don't want this to be committed to the repository.
-
-## Add To Metadata
-
-In the `app/layout.tsx` file, we can add the `APP_NAME` and `APP_DESCRIPTION` to the metadata object.
-
-Import the contstants and add them to the metadata object:
-
-```tsx
-import { APP_NAME, APP_DESCRIPTION, SERVER_URL } from '@/lib/constants';
-```
-
-```tsx
-export const metadata: Metadata = {
-  title: {
-    template: `%s | ${APP_NAME}`,
-    default: APP_NAME,
-  },
-  description: APP_DESCRIPTION,
-  metadataBase: new URL(SERVER_URL),
-};
-```
-
-For the `title`, we are using a template to set the title. So if we set a title for an individual page, it will be prepended with the `APP_NAME` and a pipe character.
-
-`metadataBase` is used to set the base URL for the metadata.
-
-In the next lesson we will work on the header and footer components.
+Now we have a header and footer on the page.
