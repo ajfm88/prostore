@@ -1,156 +1,188 @@
-# Header & Footer Component
+# Theme Mode Toggle
 
-Let's start to work on the main components of our website. We will start with the header component.
+We are going to add a theme toggle to our app. This will allow the user to switch between a light and dark theme as well as a system theme.
 
-The way we are going to structure our component files will be a bit different than I usually do. If the component will include multiple embedded components, we will have them in a folder inside of a folder called shared. For instance, the header will consist of not only the header component, but other ahared components such as the mode toggle.
+## Dependencies
 
-Create a folder at `components/shared/header`. For the main header component, the file will be called `index.tsx`. So we are doing this in a Next.js-like way. Like the pages and routes.
+We are going to use a dropdown menu to allow the user to select a theme. Run the following command in your terminal:
 
-It's important to mention that you can structure your components in any way you like. This is just the way I want to do it.
+```bash
+npx shadcn@latest add dropdown-menu
+```
 
-Create a file at `components/shared/header/index.tsx` and add the following code:
+We are also using a package called `next-themes`, which allows us to easily switch between light and dark themes. Run the following command in your terminal:
+
+```bash
+npm install next-themes
+```
+
+## Mode Toggle Component
+
+Create a new file at `components/shared/header/mode-toggle.tsx`.
+
+Create a basic component:
 
 ```tsx
-const Header = () => {
-  return <>Header</>;
+const ModeToggle = () => {
+  return <>ModeToggle</>;
 };
 
-export default Header;
+export default ModeToggle;
 ```
 
-## Embedding the Header Component
-
-We are going to embed the header in our root group layout file (`app/(root)/layout.tsx`). Not the main layout file (`app/layout.tsx`).
-
-Open the `app/(root)/layout.tsx` file and add the following import:
+Bring it into the `components/shared/header/index.tsx` file:
 
 ```tsx
-import Header from "@/components/shared/header";
+import ModeToggle from './mode-toggle';
 ```
 
-Since the file is called `index.tsx`, we don't need to specify the file name when importing it.
-
-Now embed it:
+Embed it right above the button that surrounds the shopping cart link and inside the div with the class `space-x-2`:
 
 ```tsx
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <div className="flex h-screen flex-col">
-      <Header />
-      <main className="flex-1 wrapper">{children}</main>
-    </div>
-  );
+<div className='space-x-2'>
+  <ModeToggle /> 👈 Add this line
+  <Button asChild variant='ghost'>
+    <Link href='/cart'>
+      <ShoppingCart />
+      Cart
+    </Link>
+  </Button>
+  // ...
+</div>
+```
+
+You should see the text in the header.
+
+Go back to the `components/shared/header/mode-toggle.tsx` file and add the following imports. We also need to make this a client component since we are using hooks:
+
+```tsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { MoonIcon, SunIcon, SunMoon } from 'lucide-react';
+```
+
+We are bringing in the `useTheme` hook from `next-themes` to allow us to switch between light and dark themes. We are also bringing in the `useState` and `useEffect` hooks and some dropdown components and icons.
+
+Add the following inside the function above the return statement:
+
+```tsx
+const { theme, setTheme } = useTheme();
+```
+
+The theme switching is easy. We simply get the theme state from the hook. We can then use the `setTheme` function to switch between light and dark themes.
+
+## Output
+
+Now we just need to add the output in the return statement. Replace the `<>ModeToggle</>` with the following:
+
+````tsx
+ <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          className="focus-visible:ring-0 focus-visible:ring-offset-0"
+        >
+          {theme === 'system' ? (
+            <SunMoon />
+          ) : theme === 'dark' ? (
+            <MoonIcon />
+          ) : (
+            <SunIcon />
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuLabel>Appearance</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem
+          checked={theme === 'system'}
+          onClick={() => setTheme('system')}
+        >
+          System
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={theme === 'light'}
+          onClick={() => setTheme('light')}
+        >
+          Light
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={theme === 'dark'}
+          onClick={() => setTheme('dark')}
+        >
+          Dark
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+    ```
+````
+
+We are checking the theme state and then rendering the appropriate icon. We are also adding a dropdown menu with three options: system, light, and dark. We are also adding a checkbox item for each option. We are also setting the theme state when the checkbox item is clicked. The logic here is pretty simple.
+
+## Theme Provider
+
+In order to use the theme state in our app we need to wrap our app in a theme provider. This is something that will be used throughout the entire project, so we want this in our main layout. Open the `app/layout.tsx` file and add the following import:
+
+```tsx
+import { ThemeProvider } from 'next-themes';
+```
+
+Now just wrap the output with the theme provider:
+
+```tsx
+return (
+  <html lang='en'>
+    <body className={`${inter.className}`}>
+      <ThemeProvider
+        attribute='class'
+        defaultTheme='light'
+        enableSystem
+        disableTransitionOnChange
+      >
+        {children}
+      </ThemeProvider>
+    </body>
+  </html>
+```
+
+We are adding a couple of options to the theme provider. The `attribute` prop is used to set the data-theme attribute on the html element. The `defaultTheme` prop is used to set the default theme. The `enableSystem` prop is used to enable the system theme. The `disableTransitionOnChange` prop is used to disable the transition when the theme changes. I chose to set the default to light but you can set it to dark or system if you want.
+
+## Fix Hydration Issue
+
+If you run the app now you will see an error in the console about hydration. You can fix this by adding the `surpressHydrationWarning` attribute to the `<html>` tag in the main layout.
+
+
+
+One of the reasons is listed as "Server/client branch like if (typeof window !== 'undefined')"
+
+This is a common cause with next-themes because it uses window to detect and set the theme. Since window isn’t available on the server, the theme sometimes behaves differently between SSR and client-side rendering.
+
+We can fix this by making sure the component is mounted before the theme is set. We can do this by setting a `mounted` state and then checking if the component is mounted before setting the theme. Add the following inside the function above the return statement:
+
+```tsx
+const [mounted, setMounted] = useState(false);
+
+useEffect(() => {
+  setMounted(true);
+}, []);
+if (!mounted) {
+  return null;
 }
 ```
 
-Now we can see the text `Header` on the page.
+So when you see this hydration error, this is what you can do to fix it.
 
-Hint: If you want to import something that is not imported, you can press `Ctrl + .` and select to import it.
+If you see any other errors that say something like the client doesn't match the server, it is most likely from a browser extension that changes the HTML of the page. You can leave it or try and find the extension that is causing the issue. Lastpass and some of the color picker extensions are known to cause this issue.
 
-Add the following to the `Header` component:
-
-```tsx
-import { ShoppingCart, UserIcon } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-
-import { Button } from "@/components/ui/button";
-import { APP_NAME } from "@/lib/constants";
-
-const Header = () => {
-  return (
-    <header className="w-full border-b">
-      <div className="wrapper flex-between">
-        <div className="flex-start">
-          <Link href="/" className="flex-start">
-            <Image
-              priority={true}
-              src="/images/logo.svg"
-              width={48}
-              height={48}
-              alt={`${APP_NAME} logo`}
-            />
-            <span className="hidden lg:block font-bold text-2xl ml-3">
-              {APP_NAME}
-            </span>
-          </Link>
-        </div>
-        <div className="space-x-2">
-          <Button asChild variant="ghost">
-            <Link href="/cart">
-              <ShoppingCart />
-              Cart
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/sign-in">
-              <UserIcon />
-              Sign In
-            </Link>
-          </Button>
-        </div>
-      </div>
-    </header>
-  );
-};
-
-export default Header;
-```
-
-We are bringing in the `ShoppingCart` and `UserIcon` from the `lucide-react` library. We are also using the `Button` component from the `@/components/ui/button` file. We are using the `Link` component from `next/link` to create a link to the `/cart` page. We are also using the `APP_NAME` constant from the `@/lib/constants` file.
-
-The logo will have the app name on larger screens and on smaller screens it will be hidden.
-
-We are using the `ghost` variant of the `Button` component. This is because we want the button to have a transparent background. We are also using the `asChild` prop to make the button a child of the `Link` component. This is because we want the button to be a child of the `Link` component.
-
-## Footer Component
-
-Create a file at `components/footer.tsx` and add the following code:
-
-```tsx
-import { APP_NAME } from "@/lib/constants";
-
-const Footer = () => {
-  const currentYear = new Date().getFullYear();
-
-  return (
-    <footer className="border-t">
-      <div className="p-5 flex-center">
-        {currentYear} {APP_NAME}. All Rights reserved.
-      </div>
-    </footer>
-  );
-};
-
-export default Footer;
-```
-
-Bring the footer into the `app/(root)/layout.tsx` file.
-
-```tsx
-import Footer from "@/components/footer";
-```
-
-Now embed it:
-
-```tsx
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <div className="flex h-screen flex-col">
-      <Header />
-      <main className="flex-1 wrapper">{children}</main>
-      <Footer />
-    </div>
-  );
-}
-```
-
-Now we have a header and footer on the page.
+Now we have a cool theme toggler. Let's move on.
