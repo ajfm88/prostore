@@ -1,188 +1,94 @@
-# Theme Mode Toggle
+# Loading and Not Found Page
 
-We are going to add a theme toggle to our app. This will allow the user to switch between a light and dark theme as well as a system theme.
+In Next.js, you can create a loading page and a not found page simply by naming the files `loading` and `not-found` respectively.
 
-## Dependencies
+## Loading Page
 
-We are going to use a dropdown menu to allow the user to select a theme. Run the following command in your terminal:
+Let's create a loading page with a spinner. There are a lot of ways to do this. There are packages like [react-spinners](https://www.npmjs.com/package/react-spinners) that you can use to create a loading page. You could also just use text or an image. I am going to use an image that is visible in both light and dark mode. I have attached a download for the image to this lesson. You can also get it from the final repository.
 
-```bash
-npx shadcn@latest add dropdown-menu
-```
+The image is called `loader.gif` and we're going to put it in the `assets` folder.
 
-We are also using a package called `next-themes`, which allows us to easily switch between light and dark themes. Run the following command in your terminal:
-
-```bash
-npm install next-themes
-```
-
-## Mode Toggle Component
-
-Create a new file at `components/shared/header/mode-toggle.tsx`.
-
-Create a basic component:
+Now create a file called `loading.tsx` in the `app` folder and add the following code:
 
 ```tsx
-const ModeToggle = () => {
-  return <>ModeToggle</>;
+import Image from 'next/image';
+import loader from '@/assets/loader.gif';
+
+const Loading = () => {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        width: '100vw',
+      }}
+    >
+      <Image src={loader} width={150} height={150} alt='Loading...' />
+    </div>
+  );
 };
 
-export default ModeToggle;
+export default Loading;
 ```
 
-Bring it into the `components/shared/header/index.tsx` file:
+We are just bringing in the image and displaying it using the `Image` component from Next.js. We are also setting the height and width of the image to 150 pixels and aligning it to the center of the screen.
 
-```tsx
-import ModeToggle from './mode-toggle';
+Now if you refresh the page, you will see the loading page. If you don't see it it's because it loaded too fast. You can test by adding the following to the `app/(root)/page.tsx`:
+
+```jsx
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const Homepage = async () => {
+    await delay(2000);
+  return <>Prostore</>;
+};
+
+export default Homepage;
+
 ```
 
-Embed it right above the button that surrounds the shopping cart link and inside the div with the class `space-x-2`:
+## Not Found Page
 
-```tsx
-<div className='space-x-2'>
-  <ModeToggle /> 👈 Add this line
-  <Button asChild variant='ghost'>
-    <Link href='/cart'>
-      <ShoppingCart />
-      Cart
-    </Link>
-  </Button>
-  // ...
-</div>
-```
+Now we want a not found page. Go to any page that does not exist and you will see the default not found page. You can keep this if you want but I like to create a custom one with a button or link to go to the homepage.
 
-You should see the text in the header.
-
-Go back to the `components/shared/header/mode-toggle.tsx` file and add the following imports. We also need to make this a client component since we are using hooks:
+Create a file called `not-found.tsx` in the `app` folder and add the following code:
 
 ```tsx
 'use client';
-
-import { useEffect, useState } from 'react';
-import { useTheme } from 'next-themes';
+import { APP_NAME } from '@/lib/constants';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { MoonIcon, SunIcon, SunMoon } from 'lucide-react';
-```
 
-We are bringing in the `useTheme` hook from `next-themes` to allow us to switch between light and dark themes. We are also bringing in the `useState` and `useEffect` hooks and some dropdown components and icons.
-
-Add the following inside the function above the return statement:
-
-```tsx
-const { theme, setTheme } = useTheme();
-```
-
-The theme switching is easy. We simply get the theme state from the hook. We can then use the `setTheme` function to switch between light and dark themes.
-
-## Output
-
-Now we just need to add the output in the return statement. Replace the `<>ModeToggle</>` with the following:
-
-````tsx
- <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+const NotFound = () => {
+  return (
+    <div className='flex flex-col items-center justify-center min-h-screen '>
+      <Image
+        priority={true}
+        src='/images/logo.svg'
+        width={48}
+        height={48}
+        alt={`${APP_NAME} logo`}
+      />
+      <div className='p-6 rounded-lg shadow-md w-1/3 text-center'>
+        <h1 className='text-3xl font-bold mb-4'>Not Found</h1>
+        <p className='text-destructive'>Could not find requested resource</p>
         <Button
-          variant="ghost"
-          className="focus-visible:ring-0 focus-visible:ring-offset-0"
+          variant='outline'
+          className='mt-4 ml-2'
+          onClick={() => (window.location.href = '/')}
         >
-          {theme === 'system' ? (
-            <SunMoon />
-          ) : theme === 'dark' ? (
-            <MoonIcon />
-          ) : (
-            <SunIcon />
-          )}
+          Back to home
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuLabel>Appearance</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuCheckboxItem
-          checked={theme === 'system'}
-          onClick={() => setTheme('system')}
-        >
-          System
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={theme === 'light'}
-          onClick={() => setTheme('light')}
-        >
-          Light
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={theme === 'dark'}
-          onClick={() => setTheme('dark')}
-        >
-          Dark
-        </DropdownMenuCheckboxItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-    ```
-````
+      </div>
+    </div>
+  );
+};
 
-We are checking the theme state and then rendering the appropriate icon. We are also adding a dropdown menu with three options: system, light, and dark. We are also adding a checkbox item for each option. We are also setting the theme state when the checkbox item is clicked. The logic here is pretty simple.
-
-## Theme Provider
-
-In order to use the theme state in our app we need to wrap our app in a theme provider. This is something that will be used throughout the entire project, so we want this in our main layout. Open the `app/layout.tsx` file and add the following import:
-
-```tsx
-import { ThemeProvider } from 'next-themes';
+export default NotFound;
 ```
 
-Now just wrap the output with the theme provider:
+We have the logo, a heading, a paragraph, and a button. The button will take you back to the homepage. You could use a link instead of a button if you want.
 
-```tsx
-return (
-  <html lang='en'>
-    <body className={`${inter.className}`}>
-      <ThemeProvider
-        attribute='class'
-        defaultTheme='light'
-        enableSystem
-        disableTransitionOnChange
-      >
-        {children}
-      </ThemeProvider>
-    </body>
-  </html>
-```
-
-We are adding a couple of options to the theme provider. The `attribute` prop is used to set the data-theme attribute on the html element. The `defaultTheme` prop is used to set the default theme. The `enableSystem` prop is used to enable the system theme. The `disableTransitionOnChange` prop is used to disable the transition when the theme changes. I chose to set the default to light but you can set it to dark or system if you want.
-
-## Fix Hydration Issue
-
-If you run the app now you will see an error in the console about hydration. You can fix this by adding the `surpressHydrationWarning` attribute to the `<html>` tag in the main layout.
-
-
-
-One of the reasons is listed as "Server/client branch like if (typeof window !== 'undefined')"
-
-This is a common cause with next-themes because it uses window to detect and set the theme. Since window isn’t available on the server, the theme sometimes behaves differently between SSR and client-side rendering.
-
-We can fix this by making sure the component is mounted before the theme is set. We can do this by setting a `mounted` state and then checking if the component is mounted before setting the theme. Add the following inside the function above the return statement:
-
-```tsx
-const [mounted, setMounted] = useState(false);
-
-useEffect(() => {
-  setMounted(true);
-}, []);
-if (!mounted) {
-  return null;
-}
-```
-
-So when you see this hydration error, this is what you can do to fix it.
-
-If you see any other errors that say something like the client doesn't match the server, it is most likely from a browser extension that changes the HTML of the page. You can leave it or try and find the extension that is causing the issue. Lastpass and some of the color picker extensions are known to cause this issue.
-
-Now we have a cool theme toggler. Let's move on.
+Feel free to use a different layout for these pages. I just wanted to create something simple.
