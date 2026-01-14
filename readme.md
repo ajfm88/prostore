@@ -1,94 +1,192 @@
-# Loading and Not Found Page
+# Responsive Sheet Menu
 
-In Next.js, you can create a loading page and a not found page simply by naming the files `loading` and `not-found` respectively.
+In this lesson, I want to make the navigation responsive. We will use a `Sheet` component from the shadcn/ui library. The `Sheet` component is a modal that slides in from the right side of the screen. We will use it to display the navigation links on smaller screens.
 
-## Loading Page
+Install the sheet component:
 
-Let's create a loading page with a spinner. There are a lot of ways to do this. There are packages like [react-spinners](https://www.npmjs.com/package/react-spinners) that you can use to create a loading page. You could also just use text or an image. I am going to use an image that is visible in both light and dark mode. I have attached a download for the image to this lesson. You can also get it from the final repository.
-
-The image is called `loader.gif` and we're going to put it in the `assets` folder.
-
-Now create a file called `loading.tsx` in the `app` folder and add the following code:
-
-```tsx
-import Image from 'next/image';
-import loader from '@/assets/loader.gif';
-
-const Loading = () => {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        width: '100vw',
-      }}
-    >
-      <Image src={loader} width={150} height={150} alt='Loading...' />
-    </div>
-  );
-};
-
-export default Loading;
+```bash
+npx shadcn@latest add sheet
 ```
 
-We are just bringing in the image and displaying it using the `Image` component from Next.js. We are also setting the height and width of the image to 150 pixels and aligning it to the center of the screen.
+## Create The `Menu` Component
 
-Now if you refresh the page, you will see the loading page. If you don't see it it's because it loaded too fast. You can test by adding the following to the `app/(root)/page.tsx`:
+We are going to create a separate component for the menu.
 
-```jsx
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const Homepage = async () => {
-    await delay(2000);
-  return <>Prostore</>;
-};
-
-export default Homepage;
-
-```
-
-## Not Found Page
-
-Now we want a not found page. Go to any page that does not exist and you will see the default not found page. You can keep this if you want but I like to create a custom one with a button or link to go to the homepage.
-
-Create a file called `not-found.tsx` in the `app` folder and add the following code:
+Creare a new file at `components/shared/header/menu.tsx` and add the following imports:
 
 ```tsx
-'use client';
-import { APP_NAME } from '@/lib/constants';
-import Image from 'next/image';
+import { EllipsisVertical, ShoppingCart, UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
+import Link from 'next/link';
+import ModeToggle from './mode-toggle';
+```
 
-const NotFound = () => {
+Add the following code:
+
+```tsx
+const Menu = () => {
   return (
-    <div className='flex flex-col items-center justify-center min-h-screen '>
-      <Image
-        priority={true}
-        src='/images/logo.svg'
-        width={48}
-        height={48}
-        alt={`${APP_NAME} logo`}
-      />
-      <div className='p-6 rounded-lg shadow-md w-1/3 text-center'>
-        <h1 className='text-3xl font-bold mb-4'>Not Found</h1>
-        <p className='text-destructive'>Could not find requested resource</p>
-        <Button
-          variant='outline'
-          className='mt-4 ml-2'
-          onClick={() => (window.location.href = '/')}
-        >
-          Back to home
-        </Button>
+    <>
+      <div className='flex justify-end gap-3'>
+        <nav className='md:flex hidden w-full max-w-xs gap-1'>
+          <ModeToggle />
+          <Button asChild variant='ghost'>
+            <Link href='/cart'>
+              <ShoppingCart />
+              Cart
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href='/sign-in'>
+              <UserIcon />
+              Sign In
+            </Link>
+          </Button>
+        </nav>
       </div>
-    </div>
+    </>
   );
 };
 
-export default NotFound;
+export default Menu;
 ```
 
-We have the logo, a heading, a paragraph, and a button. The button will take you back to the homepage. You could use a link instead of a button if you want.
+Let's replace the right side of the header with this Menu component. Open the `components/shared/header/index.tsx` file and remove the Button, icons and ModeToggle imports and import the Menu. Then replace the ` <div className='space-x-2'>` and everything in it with the `<Menu />` component.
 
-Feel free to use a different layout for these pages. I just wanted to create something simple.
+It should look like this:
+
+```tsx
+import Image from 'next/image';
+import Link from 'next/link';
+import { APP_NAME } from '@/lib/constants';
+import Menu from './menu';
+
+const Header = () => {
+  return (
+    <header className='w-full border-b'>
+      <div className='wrapper flex-between'>
+        <div className='flex-start'>
+          <Link href='/' className='flex-start'>
+            <Image
+              priority={true}
+              src='/images/logo.svg'
+              width={48}
+              height={48}
+              alt={`${APP_NAME} logo`}
+            />
+            <span className='hidden lg:block font-bold text-2xl ml-3'>
+              {APP_NAME}
+            </span>
+          </Link>
+        </div>
+        <Menu />
+      </div>
+    </header>
+  );
+};
+
+export default Header;
+```
+
+You should basically see the same thing. The only difference is that the menu is now a separate component.
+
+## Add The Sheet Component
+
+Now let's create the sheet. Add the following code under the ending `</nav>` tag in the `Menu` component:
+
+```tsx
+<nav className='md:hidden'>
+  <Sheet>
+    <SheetTrigger className='align-middle'>
+      <EllipsisVertical />
+    </SheetTrigger>
+    <SheetContent className='flex flex-col items-start'>
+      <SheetTitle>Menu</SheetTitle>
+      <ModeToggle />
+      <Button asChild variant='ghost'>
+        <Link href='/cart'>
+          <ShoppingCart />
+          Cart
+        </Link>
+      </Button>
+       <Button asChild>
+        <Link href='/sign-in'>
+          <UserIcon />
+          Sign In
+        </Link>
+      </Button>
+      <SheetDescription></SheetDescription>
+    </SheetContent>
+  </Sheet>
+</nav>
+```
+
+The sheet component is a modal that slides in from the right side of the screen. We are using it to display the navigation links on smaller screens. The `SheetTrigger` component is a button that triggers the sheet to slide in. The `SheetContent` component is the content of the sheet. We are using it to display the navigation links. The `SheetTitle` and `SheetDescription` components are required or you will get a warning in the console. I am just adding the text "Menu" in the title and leaving the description blank.
+
+Now when you make the screen smaller, you should see the EllipsisVertical icon. Click on it and you should see the navigation links. You can't see the sign in, but don't worry about that because we will be changing that around in a future lesson.
+
+Here is the final code for the Menu component:
+
+```tsx
+import { EllipsisVertical, ShoppingCart, UserIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import Link from 'next/link';
+import ModeToggle from './mode-toggle';
+
+const Menu = () => {
+  return (
+    <>
+      <div className='flex justify-end gap-3'>
+        <nav className='md:flex hidden w-full max-w-xs gap-1'>
+          <ModeToggle />
+          <Button asChild variant='ghost'>
+            <Link href='/cart'>
+              <ShoppingCart />
+              Cart
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href='/sign-in'>
+              <UserIcon />
+              Sign In
+            </Link>
+          </Button>
+        </nav>
+        <nav className='md:hidden'>
+          <Sheet>
+            <SheetTrigger className='align-middle'>
+              <EllipsisVertical />
+            </SheetTrigger>
+            <SheetContent className='flex flex-col items-start'>
+              <SheetTitle>Menu</SheetTitle>
+              <ModeToggle />
+              <Button asChild variant='ghost'>
+                <Link href='/cart'>
+                  <ShoppingCart />
+                  Cart
+                </Link>
+              </Button>
+               <Button asChild>
+                <Link href='/sign-in'>
+                  <UserIcon />
+                  Sign In
+                </Link>
+              </Button>
+            </SheetContent>
+          </Sheet>
+        </nav>
+      </div>
+    </>
+  );
+};
+
+export default Menu;
+```
