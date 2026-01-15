@@ -1,192 +1,133 @@
-# Responsive Sheet Menu
+# List Sample Products
 
-In this lesson, I want to make the navigation responsive. We will use a `Sheet` component from the shadcn/ui library. The `Sheet` component is a modal that slides in from the right side of the screen. We will use it to display the navigation links on smaller screens.
+In this lesson, we are going to start to display some products on our page. We are going to use a sample data set and sample images. Right now, the data will come from a file. Later on, we will use a database and the Prisma ORM to fetch the data. You could start with the database, but this is how I typically start a project. I like to get some of the basic layout and functionality working first and then add the database.
 
-Install the sheet component:
+## Sample Data
 
-```bash
-npx shadcn@latest add sheet
-```
+In this lesson, you will have a download for the sample data, which will include the data file and the images. You can also get them from the main Github repository.
 
-## Create The `Menu` Component
+Download the data and move the `images/sample-products` folder with the images to the `public/images` folder. There are also two banners. Move those to the `public/images` folder as well.
 
-We are going to create a separate component for the menu.
+Move the `db` folder with the `sample-data.ts` file to the root of the project. This `db` folder will have other stuff in it later such as a seeder.
 
-Creare a new file at `components/shared/header/menu.tsx` and add the following imports:
+Look at the sample data and get a feel for what the data looks like. There are only products for now but later, we will have users as well.
+
+#### Product Fields
+
+- `name`: The product name.
+- `slug`: The product slug.
+- `category`: The product category.
+- `description`: The product description.
+- `images`: Array of product image paths.
+- `price`: The product price.
+- `brand`: The product brand.
+- `rating`: The product rating.
+- `numReviews`: The number of reviews for the product.
+- `stock`: The product stock.
+- `isFeatured`: Whether the product is featured.
+- `banner` (optional): The product banner.
+
+## Product List Component
+
+We are going to have a component to list products. Create a new file at `components/shared/product/product-list.tsx` and add the following code:
 
 ```tsx
-import { EllipsisVertical, ShoppingCart, UserIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
-import Link from 'next/link';
-import ModeToggle from './mode-toggle';
-```
-
-Add the following code:
-
-```tsx
-const Menu = () => {
+const ProductList = ({ data, title }: { data: any; title?: string }) => {
   return (
-    <>
-      <div className='flex justify-end gap-3'>
-        <nav className='md:flex hidden w-full max-w-xs gap-1'>
-          <ModeToggle />
-          <Button asChild variant='ghost'>
-            <Link href='/cart'>
-              <ShoppingCart />
-              Cart
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href='/sign-in'>
-              <UserIcon />
-              Sign In
-            </Link>
-          </Button>
-        </nav>
-      </div>
-    </>
-  );
-};
-
-export default Menu;
-```
-
-Let's replace the right side of the header with this Menu component. Open the `components/shared/header/index.tsx` file and remove the Button, icons and ModeToggle imports and import the Menu. Then replace the ` <div className='space-x-2'>` and everything in it with the `<Menu />` component.
-
-It should look like this:
-
-```tsx
-import Image from 'next/image';
-import Link from 'next/link';
-import { APP_NAME } from '@/lib/constants';
-import Menu from './menu';
-
-const Header = () => {
-  return (
-    <header className='w-full border-b'>
-      <div className='wrapper flex-between'>
-        <div className='flex-start'>
-          <Link href='/' className='flex-start'>
-            <Image
-              priority={true}
-              src='/images/logo.svg'
-              width={48}
-              height={48}
-              alt={`${APP_NAME} logo`}
-            />
-            <span className='hidden lg:block font-bold text-2xl ml-3'>
-              {APP_NAME}
-            </span>
-          </Link>
+     < className='my-10'>
+      <h2 className='h2-bold mb-4'>{title}</h2>
+      {data.length > 0 ? (
+          <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
+            {data.map((product: any) => (
+              <>{product.name}</>
+            ))}
+          </div>
+      ) : (
+        <div>
+          <p>No product found</p>
         </div>
-        <Menu />
-      </div>
-    </header>
-  );
-};
-
-export default Header;
-```
-
-You should basically see the same thing. The only difference is that the menu is now a separate component.
-
-## Add The Sheet Component
-
-Now let's create the sheet. Add the following code under the ending `</nav>` tag in the `Menu` component:
-
-```tsx
-<nav className='md:hidden'>
-  <Sheet>
-    <SheetTrigger className='align-middle'>
-      <EllipsisVertical />
-    </SheetTrigger>
-    <SheetContent className='flex flex-col items-start'>
-      <SheetTitle>Menu</SheetTitle>
-      <ModeToggle />
-      <Button asChild variant='ghost'>
-        <Link href='/cart'>
-          <ShoppingCart />
-          Cart
-        </Link>
-      </Button>
-       <Button asChild>
-        <Link href='/sign-in'>
-          <UserIcon />
-          Sign In
-        </Link>
-      </Button>
-      <SheetDescription></SheetDescription>
-    </SheetContent>
-  </Sheet>
-</nav>
-```
-
-The sheet component is a modal that slides in from the right side of the screen. We are using it to display the navigation links on smaller screens. The `SheetTrigger` component is a button that triggers the sheet to slide in. The `SheetContent` component is the content of the sheet. We are using it to display the navigation links. The `SheetTitle` and `SheetDescription` components are required or you will get a warning in the console. I am just adding the text "Menu" in the title and leaving the description blank.
-
-Now when you make the screen smaller, you should see the EllipsisVertical icon. Click on it and you should see the navigation links. You can't see the sign in, but don't worry about that because we will be changing that around in a future lesson.
-
-Here is the final code for the Menu component:
-
-```tsx
-import { EllipsisVertical, ShoppingCart, UserIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import Link from 'next/link';
-import ModeToggle from './mode-toggle';
-
-const Menu = () => {
-  return (
-    <>
-      <div className='flex justify-end gap-3'>
-        <nav className='md:flex hidden w-full max-w-xs gap-1'>
-          <ModeToggle />
-          <Button asChild variant='ghost'>
-            <Link href='/cart'>
-              <ShoppingCart />
-              Cart
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href='/sign-in'>
-              <UserIcon />
-              Sign In
-            </Link>
-          </Button>
-        </nav>
-        <nav className='md:hidden'>
-          <Sheet>
-            <SheetTrigger className='align-middle'>
-              <EllipsisVertical />
-            </SheetTrigger>
-            <SheetContent className='flex flex-col items-start'>
-              <SheetTitle>Menu</SheetTitle>
-              <ModeToggle />
-              <Button asChild variant='ghost'>
-                <Link href='/cart'>
-                  <ShoppingCart />
-                  Cart
-                </Link>
-              </Button>
-               <Button asChild>
-                <Link href='/sign-in'>
-                  <UserIcon />
-                  Sign In
-                </Link>
-              </Button>
-            </SheetContent>
-          </Sheet>
-        </nav>
-      </div>
+      )}
     </>
   );
 };
 
-export default Menu;
+export default ProductList;
 ```
+This component will take in the data and display the product name for now. Ultimately, we will display the product card with the data, but for now, this is ok.
+
+Another thing that I want to mention is that we're using the `any` type for the data. This isn't really a good practice, but for now, it's ok because we're going to be implementing something called "Zod" later to validate the data.
+
+
+## Use the Product List Component
+
+Open the homepage at `app/(root)page.tsx` and import the data and the component:
+
+```tsx
+import ProductList from '@/components/shared/product/product-list';
+import sampleData from '@/db/sample-data';
+```
+
+Then add the following to the return:
+
+```tsx
+const HomePage = () => {
+  return (
+    <div className='space-y-8'>
+      <h2 className='h2-bold'>Latest Products</h2>
+      <ProductList title='Newest Arrivals' data={sampleData.products} />
+    </div>
+  );
+};
+export default HomePage;
+```
+
+You should now see the product names in the browser. 
+
+## Limit The Products
+
+Let's also add a `limit` prop so we don't have to show all the products:
+
+```tsx
+const ProductList = ({
+  data,
+  title,
+  limit,
+}: {
+  data: any[];
+  title?: string;
+  limit?: number;
+}) => {
+  // Apply limit if provided, otherwise show all products
+  const limitedData = limit ? data.slice(0, limit) : data;
+
+  return (
+    <div className='my-10'>
+      <h2 className='h2-bold mb-4'>{title}</h2>
+      {limitedData.length > 0 ? (
+        <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
+          {limitedData.map((product: any) => (
+            <>{product.name}</>
+          ))}
+        </div>
+      ) : (
+        <div>
+          <p>No products found</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ProductList;
+```
+
+Now change the embed to the following:
+
+```tsx
+<ProductList title='Newest Arrivals' data={sampleData.products} limit={4} />
+```
+
+You should only see 4 products now.
+
+In the next lesson, we will create product cards.
+
