@@ -1,19 +1,51 @@
-# Section Intro
+# Postgres & Prisma Setup
 
-Now that we have our basic layout and some components including the product card display, we can start to implement a database.
+We are going to setup our database. You have many options for this. Some good ones are Neon, Supabase, AWS, PlanetScale, and MongoDB. We will be using Vercel Postgres, which is a managed Postgres database that actually uses Neon under the hood. You can read more about it [here](https://vercel.com/docs/storage/vercel-postgres).
 
-We're going to be using a cloud PostgreSQL database that is offered through Vercel but is managed and is hosted by Neon, which is a great company and service. We're using the free tier so you don't need to pay anything or enter any credit card information to use this service. 
+You first need to log into your Vercel account. Then click on the "Storage" tab and select "Create" next to Postgres.
 
-We'll be using Prisma as our ORM to interact with our database. Instead of writing raw SQL queries, Prisma offers easy to use methods to create, read, update, delete and more.
+Give it a name and click "Create".
 
-Prisma has models that we can setup in the schema file and these models pertain to the database tables. So we define the fields, types and other annotations like default values and primary keys.
+<img src="../images/vercel-postgres.png" alt="Vercel Postgres Create" />
 
-Once we create these models, we can use them to create and run a migration, which will actually create our tables with all the fileds. So there's no having to go into something like PG Admin to create our fields and provision the database.
+Once you do that, you will see a database string. We will come back to this in a few minutes.
 
-I want to have some sample data to work with so I'll show you how we can setup seeding, which is an easy, reusable way to populate our database with sample data.
+## Install Prisma
 
-Another library we'll be using and setting up is `Zod` which is a schema validation library. We'll be using it to validate our data to make sure that it is in the correct format. We'll get this setup in this section.
+Prisma is an ORM that will help us interact with the database. It is a TypeScript-first ORM that makes it easy to work with databases. It is a great choice for TypeScript projects. I prefer it over the vercel-postgres package and many others.
 
-Once everything is setup and we run our migrations, we'll refactor our code to use the database and Prisma instead of the TypeScript file with the sample data. We're going to create the product details page as well as the product images component which will have a large image and then clickable thumbnails under it.
+Run the following command to install Prisma:
 
-Lastly, we're actually going to deploy our application to Vercel. Usually I wait until the end, but I want this course to be more realistic and to show you how to deploy your application and have continuous deployment. So that when you push to Github, your application will automatically be deployed to Vercel. So we'll have our development environment and our production environment throughout the course.
+```bash
+npm install -D prisma @prisma/client
+```
+
+Now run the following command to initialize Prisma:
+
+```bash
+npx prisma init
+```
+
+This creates a `prisma` folder with a `schema.prisma` file. This is where we will define our database schema. It also adds a `DATABASE_URL` environment variable to your `.env` file.
+
+Go back to your Vercel Postgres dashboard and click on the "Settings" tab. Copy the `POSTGRES_PRISMA_URL` value and paste it in in the `DATABASE_URL` environment variable in your `.env` file. It will look like this:
+
+```
+DATABASE_URL="postgres://default:63TadedqJVbBH@ep-temper-base-a4v0qilv-pooler.us-east-1.aws.neon.tech:5432/verceldb?sslmode=require&pgbouncer=true&connect_timeout=15"
+```
+
+## Prisma VS Code Extension
+
+We are going to use the Prisma VS Code extension to help us with our database schema. Install it by going to the Extensions tab in VS Code and searching for "Prisma".
+
+We also want to make sure formatting is setup. Open your command pallete(Ctrl+Shift+P) and type "settings" and select "Preferences: Open User Settings (JSON)". Then add the following to the `settings.json` file:
+
+```json
+ "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  }
+```
+
+This will make sure the Prisma extension is the default formatter for `.prisma` files.
+
+In the next section, we will create our database schema.
