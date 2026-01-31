@@ -1,210 +1,118 @@
-# Zod Type Validation & Type Inference
+# Serverless Environment Config
 
-So far, we’ve been using `.ts` and `.tsx` files to work with TypeScript, but we haven’t fully utilized TypeScript's potential. For example, in our product code, we used the `any` type, which bypasses TypeScript’s benefits.
+We have Prisma working locally, but I want to do our initial deployment soon. We're going to do things a bit different in this course. Usually we build the entire app locally and then deploy at the end. I want to take a more real-world approach and deploy in increments. This will allow us to catch any issues early on and make sure everything is working as expected. Rather than having a bunch of issues thrown at us when we deploy, we'll catch them as we go.
 
-Now, let’s take a step up by introducing zod, a powerful library for runtime validation and type inference.
+Now we have something to address. Traditional databases maintain persistent TCP connections to handle requests. However, serverless environments (like Vercel) are designed to scale automatically and don’t maintain persistent connections between invocations. If you try to connect directly to a database from a serverless function, you might run into issues like:
 
-## Why zod?
+- **Connection limits**: Serverless environments can spawn many instances simultaneously, exceeding database connection limits.
+- **Cold starts**: Connections are slow to initialize in serverless environments.
+- **Incompatibility with WebSockets**: Neon uses WebSockets for serverless compatibility, while Prisma assumes a traditional TCP setup.
 
-Let's talk about why we're using Zod. Creating regular TypeScript types and interfaces is great for development because they catch type errors at compile-time. However, they don’t exist at runtime, meaning they can’t validate data coming from an API, form input, or other external sources.
+The Neon adapter solves these problems by adapting Prisma’s behavior to Neon’s serverless architecture. It allows Prisma to manage connections using WebSockets and pooling, so that it works in a serverless context.
 
-With zod, we:
+## Needed Packages
 
-1. Validate data at runtime.
-2. Ensure that data matches the expected format before it’s used.
-3. Automatically infer TypeScript types from validation schemas.
+There are a few packages that we need to install to set this up:
 
-In short: zod = validation + type inference.
+- `@neondatabase/serverless`: Provides a low-level connection interface to interact with the Neon serverless PostgreSQL database using WebSockets. That's why we're also installing the websockets package. This adapter allows us to connect directly to Neon in serverless environments, such as Vercel or Netlify, where maintaining persistent connections to a database can be challenging.
+- `@prisma/adapter-neon`: This is an adapter specifically for Prisma to ensure Prisma can operate smoothly with Neon in serverless environments. Prisma by default assumes traditional database connections (over TCP), so this adapter adapts Prisma’s behavior to Neon’s serverless infrastructure, which uses WebSockets and connection pooling.
+- `ws`: This is a WebSocket library used by the Neon adapter to establish and manage connections to the Neon serverless database.
 
-
-## Install Zod
-
-Open a terminal and run the following command:
+Let's install the following packages:
 
 ```bash
-npm install zod
+npm install @neondatabase/serverless @prisma/adapter-neon ws
 ```
 
-Let's create a new file at `lib/validator.ts`. This will be where we will write our validation code.
+There are a couple dev dependencies we need to install as well:
 
-
-```ts
-import { z } from 'zod';
-
-// Schema for inserting a product
-export const insertProductSchema = z.object({
-  name: z.string().min(3, 'Name must be at least 3 characters'),
-  slug: z.string().min(3, 'Slug must be at least 3 characters'),
-  category: z.string().min(3, 'Category must be at least 3 characters'),
-  brand: z.string().min(3, 'Brand must be at least 3 characters'),
-  description: z.string().min(3, 'Description must be at least 3 characters'),
-  stock: z.coerce.number(),
-  images: z.array(z.string()).min(1, 'Product must have at least one image'),
-  isFeatured: z.boolean(),
-  banner: z.string().nullable(),
-});
-
+```bash
+npm i -D @types/ws bufferutil
 ```
 
-Each field in the schema corresponds to a property in our Product model. Fields like name, slug, and description must be at least 3 characters. Images must contain at least one image. Banner can be null because it’s optional.
+- `@types/ws`: This is the TypeScript type definitions for the ws package.
+- `bufferutil`: This is a utility package for working with buffers in Node.js.
 
-z.coerce.number() ensures that values (e.g., "10") are converted to numbers, as the stock field in our database expects a number.
+Now that we have the packages installed, we need to update our Prisma schema to use the Neon adapter. Open the `prisma/schema.prisma` file and update the provider to use the Neon adapter:
 
-
-## Handling The Price Field
-
-Handling the price field is a little more complex because prices need to be consistent and precise in the database. Imagine running an e-commerce platform where prices have inconsistent decimal places—this could lead to incorrect totals, taxes, or user confusion. By validating and formatting the price field, we ensure that every value stored in the database is accurate and predictable.
-
-Remember, with the price field:
-
-- It’s a Decimal in the database, which requires precise formatting.
-- Form inputs typically provides price as a string (e.g., "49.9"), but we need to ensure it’s valid and formatted properly before passing it to the database.
-
-
-#### Helper Function
-
-First, we're going to create a helper function. Open the `lib/utils.ts` file and add the following:
-
-```ts
-// Format number with decimal places
-export function formatNumberWithDecimal(num: number): string {
-  const [int, decimal] = num.toString().split('.');
-  return decimal ? `${int}.${decimal.padEnd(2, '0')}` : `${int}.00`;
+```prisma
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]  👈 Add this line
 }
 ```
 
-This function ensures numbers always have two decimal places. For example:
+## Generate Prisma Client
 
-- 49 becomes "49.00".
-- 49.9 becomes "49.90".
+When we make changes like this, we need to regenerate the Prisma Client. Run the following command to generate the Prisma Client:
 
-This is important for monetary values where precision matters.
-
-#### Add Validation For Price
-
-Now, let’s define a custom validation rule for the price field using zod’s `.refine()` method.
-
-Add this above your schema in validator.ts:
-
-```ts
-// Make sure price is formatted with two decimal places
-const currency = z
-  .string()
-  .refine(
-    (value) => /^\d+(\.\d{2})?$/.test(formatNumberWithDecimal(Number(value))),
-    'Price must have exactly two decimal places (e.g., 49.99)'
-  );
-
+```bash
+npx prisma generate
 ```
 
-**Explanation:**
+## Use The Adapter & Extend Prisma Client
 
-1. Input as a String:
- - The price field is received as a string (e.g., "49.9").
-2. Convert to Number:
- - Number(value) converts the string to a number (49.9).
-3. Format:
- - `formatNumberWithDecimal` ensures the number has two decimal places (e.g., 49.9 → "49.90").
-4. Validate:
- - The regex /^\d+(\.\d{2})?$/ checks that the final value is a valid decimal (e.g., "49.90").
+Now we will create a new file that will extend the Prisma Client. This will allow us to use the Neon adapter in our Prisma Client and we're also going to automatically convert the Decimal type to strings when needed.
 
- Why do we convert the string to a number? Strings like "49.9" may visually look correct but lack precision. By converting to a number, we strip out any unnecessary formatting or errors (e.g., leading zeros) and then use our helper function to enforce two decimal places before validating the result.
+Most of the code we are using here is from https://neon.tech/docs/serverless/serverless-driver. I am going to comment it so you know what is happening.
 
-#### Regex Pattern
-
- We are checking for a string that matches the following regex:
-
-```regex
-^\d+(\.\d{2})?$
-```
-
-This regex matches a string that starts with one or more digits, followed by an optional decimal point and exactly two digits. This is how we expect the price to be formatted.
-
-Here is the breakdown:
-
-- `^`: Start of the string.
-- `\d`+: Matches one or more digits (e.g., 49 in 49.99).
-- `(\.\d{2})?`: Matches an optional decimal point followed by exactly two digits `(\d{2})`. Example: .99. 
-The `?` makes the decimal part optional (it’s fine if there’s no .99).
-- `$`: End of the string.
-
-#### Add Price To Schema
-
-Now we need to use that `currency` variable for our price field in the schema
+Create a new file at `db/prisma.ts` and add the following:
 
 ```ts
-export const insertProductSchema = z.object({
-  //... other fields
-  price: currency,
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { PrismaNeon } from '@prisma/adapter-neon';
+import { PrismaClient } from '@prisma/client';
+import ws from 'ws';
+
+// Sets up WebSocket connections, which enables Neon to use WebSocket communication.
+neonConfig.webSocketConstructor = ws;
+const connectionString = `${process.env.DATABASE_URL}`;
+
+// Creates a new connection pool using the provided connection string, allowing multiple concurrent connections.
+const pool = new Pool({ connectionString });
+
+// Instantiates the Prisma adapter using the Neon connection pool to handle the connection between Prisma and Neon.
+const adapter = new PrismaNeon(pool);
+
+// Extends the PrismaClient with a custom result transformer to convert the price and rating fields to strings.
+export const prisma = new PrismaClient({ adapter }).$extends({
+  result: {
+    product: {
+      price: {
+        compute(product) {
+          return product.price.toString();
+        },
+      },
+      rating: {
+        compute(product) {
+          return product.rating.toString();
+        },
+      },
+    },
+  },
 });
-
 ```
 
-## Generate TypeScript Types
+We are basically just initializing the Prisma Client with the adapter and then extending it to convert the price and rating fields to strings.
 
-We have our validators, but we need to create the `Product` type. Create a file at `types/index.ts`. This is where we define our types. Add the following imports:
+The `compute` method is a way to transform the data before it hits our code. In this case, we are converting the price and rating fields to strings but we could do anything we want.
+
+There will be other fields that we need to convert before they hit our code as well. We'll get to that later.
+
+#### Use the New Client
+
+Now when we use Prisma, we import it from here. Open the `lib/actions/product.actions.ts` file and update the import statement to the following:
 
 ```ts
-import { z } from 'zod';
-import { insertProductSchema } from '@/lib/validator';
+import { prisma } from '@/db/prisma';
 ```
 
-We can use `z.infer` to create a product type and include all the fields from the validator. Add the following to the types file:
+And DELETE the following line:
 
 ```ts
-export type Product = z.infer<typeof insertProductSchema> & {
-  id: string;
-  createdAt: Date;
-  rating: string;
-  numReviews: number;
-};
+const prisma = new PrismaClient();
 ```
 
-So we are saying a product should have all the fields in the Zod schema plus and id, createdAt and rating.
+We already initialized it in the `prisma.ts` file.
 
-Using `z.infer` ensures that our TypeScript types are always in sync with our validation schema. If we update the schema (e.g., add a required field), the inferred type will automatically reflect the change, reducing the risk of type mismatches in our codebase.
-
-
-## Update Components
-
-Now we want to use that `Product` type.
-
-Open the `components/shared/product/product-card.tsx` file and import the `Product` type:
-
-```ts
-import { Product } from '@/types';
-```
-
-Then replace the `any` type with the `Product` type:
-
-```tsx
-const ProductCard = ({ product }: { product: Product }) => {
-  //...
-};
-```
-
-Open the `components/shared/product/product-list.tsx` file and import the `Product` type:
-
-```ts
-import { Product } from '@/types';
-```
-
-Then replace the `any` type with the `Product` type:
-
-```tsx
-const ProductList = ({ data, title }: { data: Product[]; title?: string }) => {
-  //...
-};
-```
-
-As well as within the `map` function:
-
-```tsx
-{
-  data.map((product: Product) => (
-    <ProductCard key={product.slug} product={product} />
-  ));
-}
-```
-
-Now we have an insert product validator and a type for products.
+Now everything should be working as expected.
