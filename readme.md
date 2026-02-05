@@ -1,66 +1,77 @@
-# Product Images Component
+# Initial Deployment
 
-We have the product details page. We will now create a component to show the images. There will be a main image and a list of images to click on to show the current one.
+Now we are going to make our initial deployment to Vercel.
 
-Create a file at `components/product/product-images.tsx` and add the following:
+## Create a GitHub Repository
 
-```tsx
-'use client';
-import Image from 'next/image';
+Before we deploy to Vercel, we need to create a Github repo if you don't already have one. Make sure that you have Git installed on your machine with `git --version`. If you don't have Git installed, you can download it from [here](https://git-scm.com/downloads) or install it with your package manager.
 
-import { cn } from '@/lib/utils';
-import { useState } from 'react';
+Once you have Git installed, you can create a new repository by running the following command in your terminal:
 
-const ProductImages = ({ images }: { images: string[] }) => {
-  const [current, setCurrent] = useState(0);
-
-  return (
-    <div className='space-y-4'>
-      <Image
-        src={images![current]}
-        alt='hero image'
-        width={1000}
-        height={1000}
-        className='min-h-[300px] object-cover object-center '
-      />
-      <div className='flex'>
-        {images.map((image, index) => (
-          <div
-            key={image}
-            className={cn(
-              'border   mr-2 cursor-pointer hover:border-orange-600',
-              current === index && '  border-orange-500'
-            )}
-            onClick={() => setCurrent(index)}
-          >
-            <Image src={image} alt={'image'} width={100} height={100} />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-export default ProductImages;
+```bash
+git init
 ```
 
-This is a simple component that will display the product images. We are using the `useState` hook to keep track of the current image. We are also using the `cn` function from the `@/lib/utils` file to conditionally apply the `border-orange-500` class to the current image.
+In your `/gitignore` file, make sure that you have the `.env` file listed. You don't want to commit this file to your repository.
 
-Import it in the `app/(root)/product/[slug]/page.tsx` file:
+This will create a new Git repository in the current directory. You can then add all of the files in the directory to the repository by running the following command:
 
-```tsx
-import ProductImages from '@/components/shared/product/product-images';
+```bash
+git add .
 ```
 
-And add it to the page:
+You can then commit the changes to the repository by running the following command:
 
-```tsx
-{
-  /* Images Column */
-}
-<div className='col-span-2'>
-  <ProductImages images={product.images!} />
-</div>;
+```bash
+git commit -m "Initial commit"
 ```
 
-Now you should see the images and be able to select one.
+Now go to [GitHub](https://github.com/) and create a new repository. You can name it whatever you want. Once you have created the repository, you can add the remote repository to your local repository by running the following command:
+
+```bash
+git remote add origin <your-repository-url>
+```
+
+use the `main` branch as the default branch:
+
+```bash
+git branch -M main
+```
+
+You can then push the changes to the remote repository by running the following command:
+
+```bash
+git push -u origin main
+```
+
+## Vercel
+
+We will be deploying the project to Vercel. Make sure that you create a Vercel account and sign in. You can sign in with your GitHub account.
+
+Once you are signed in, click on "Add New" and then "Project".
+
+Select the repository that you just created and click "Import".
+
+Click on the "Environment Variables" tab. Copy all of the code in your `.env` file and paste it into the "Environment Variables" section. This will allow you to use the environment variables in your Vercel project.
+
+<img src="../images/vercel-env.png" alt="Vercel Environment Variables" />
+
+Click on "Deploy".
+
+Once it's done, you should be able to go to the URL that Vercel gives you and see the project.
+
+If you get any errors that show something about dependencies, then go to the "Build & Output" settings where it says "Install Command" and add the following:
+
+```
+npm install --legacy-peer-deps
+```
+
+Then try again
+
+## Update the Server URL
+
+Now that we have deployed the project, we need to update the `SERVER_URL` in the `.env` file to the URL that Vercel gives you. This will allow the project to work correctly.
+
+Our initial deployment is complete! What is great is when you push to your repository, Vercel will automatically deploy the project. So we are pretty much all set as far as that goes.
+
+If you had any issues, be sure to check the logs in Vercel to see what went wrong.
