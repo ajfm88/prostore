@@ -1,33 +1,26 @@
 import "dotenv/config";
-import { PrismaClient } from "../lib/generated/prisma/index.js";
+import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
-import sampleData from "./sample-data";
+import sampleData from "@/db/sample-data";
 
 const { Pool } = pg;
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL environment variable is not set");
-  }
-
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-  });
-
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });
 
-  try {
-    await prisma.product.deleteMany();
-    await prisma.product.createMany({ data: sampleData.products });
-    console.log("Database seeded successfully");
-  } catch (error) {
-    console.error("Error seeding database:", error);
-    throw error;
-  } finally {
-    await prisma.$disconnect();
-  }
+  await prisma.product.deleteMany();
+  await prisma.account.deleteMany();
+  await prisma.session.deleteMany();
+  await prisma.verificationToken.deleteMany();
+  await prisma.user.deleteMany();
+
+  await prisma.product.createMany({ data: sampleData.products });
+  await prisma.user.createMany({ data: sampleData.users });
+
+  console.log("Database seeded successfully");
 }
 
 main();
