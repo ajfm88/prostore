@@ -1,82 +1,93 @@
-# Auth Layout & Sign In Page
+# Credentials Sign In Form
 
-In this lesson, we are going to create the layout and sign-in page. Auth pages will not have the header and menu. So we need a separate layout.
+We now have our sign-in page. Now we need the form. We will have this in a separate page component called `CredentialsSignInForm`. The reason for this is that you may have other sign-in forms in the future, such as a sign-in form for a third-party service like Google or Facebook. By having a separate component, we can easily swap out the form without affecting the rest of the sign-in page.
 
-Create a new group folder in the `app` folder called `(auth)`. We will have a separate layout for this group, so create `/app/(auth)/layout.tsx` and add the following code:
-
-```tsx
-const Layout = ({ children }: { children: React.ReactNode }) => {
-  return <div className='flex-center min-h-screen w-full '>{children}</div>;
-};
-export default Layout;
-```
-
-Next, create a folder called `sign-in` and add a file called `page.tsx` and create a simple component for now:
+Create a new component at `app/(auth)/sign-in/credentials-signin-form.tsx` and just add the following for now:
 
 ```tsx
-const SignIn = () => {
-  return <div>Sign In</div>;
+const CredentialsSignInForm = () => {
+  return <div>Credentials Sign In Form</div>;
 };
 
-export default SignIn;
+export default CredentialsSignInForm;
 ```
 
-Now you should be able to click on the sign in button in the header and go to /sign-in and see the text "Sign In".
-
-Let's add the imports that we will need:
+Now bring it into the `app/(auth)/sign-in/page.tsx` file and add it to the page where it says "FORM HERE":
 
 ```tsx
-import { Metadata } from 'next';
-import Image from 'next/image';
+import CredentialsSignInForm from './credentials-signin-form';
+```
+
+```tsx
+<CardContent className='space-y-4'>
+  <CredentialsSignInForm />
+</CardContent>
+```
+
+## Install Shadcn input & label components
+
+Open a terminal and run the following command:
+
+```bash
+npx shadcn@latest add input label
+```
+
+Now add the following to the `CredentialsSignInForm` component:
+
+```tsx
+'use client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { signInDefaultValues } from '@/lib/constants';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 
-import { auth } from '@/auth';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { APP_NAME } from '@/lib/constants';
-```
-
-Let's set a title. Below the imports and above the function, add the following:
-
-```tsx
-export const metadata: Metadata = {
-  title: 'Sign In',
-};
-```
-
-Now in the component, add the following:
-
-```tsx
-const SignIn = () => {
+const CredentialsSignInForm = () => {
   return (
-    <div className='w-full max-w-md mx-auto'>
-      <Card>
-        <CardHeader className='space-y-4'>
-          <Link href='/' className='flex-center'>
-            <Image
-              priority={true}
-              src='/images/logo.svg'
-              width={100}
-              height={100}
-              alt={`${APP_NAME} logo`}
-            />
+    <form>
+      <div className='space-y-6'>
+        <div>
+          <Label htmlFor='email'>Email</Label>
+          <Input
+            id='email'
+            name='email'
+            required
+            type='email'
+            defaultValue={signInDefaultValues.email}
+            autoComplete='email'
+          />
+        </div>
+        <div>
+          <Label htmlFor='password'>Password</Label>
+          <Input
+            id='password'
+            name='password'
+            required
+            type='password'
+            defaultValue={signInDefaultValues.password}
+            autoComplete='current-password'
+          />
+        </div>
+        <div>
+          <Button className='w-full' variant='default'>
+            Sign In with credentials
+          </Button>
+        </div>
+
+        <div className='text-sm text-center text-muted-foreground'>
+          Don&apos;t have an account?{' '}
+          <Link target='_self' className='link' href='/sign-up'>
+            Sign Up
           </Link>
-          <CardTitle className='text-center'>Sign In</CardTitle>
-          <CardDescription className='text-center'>
-            Select a method to sign in to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent className='space-y-4'>{/* FORM HERE */}</CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </form>
   );
 };
+
+export default CredentialsSignInForm;
 ```
 
-You should now see the card, logo, etc. Now we need to create the form, which will be in a new component.
+This is very simple so far. We are just displaying a form. We are bringing in the default values from the `signInDefaultValues` constant in the `lib/constants.ts` file.
+
+In the next lesson, we will hook up the form.
