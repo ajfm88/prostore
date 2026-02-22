@@ -1,54 +1,139 @@
-# Callback URL Redirect
+# User Button & Sign Out
 
-We also want to make it so that if we are at a certain page such as the cart, and then we sign it, we go back to that page. We can do this by adding a callback URL.
+Now that the sign in is working, we need to change the header up a bit. We will add a user button component with the user initial and a dropdown with the sign out button.
 
-Open the `app/auth/sign-in/page.tsx` and pass in the searchParams prop to get the callback URL:
+Create a new file at `components/shared/header/user-button.tsx` and add the following code for now:
 
-```tsx
-const SignIn = async (
-  props: {
-    searchParams: Promise<{
-      callbackUrl: string;
-    }>;
-  }
-) => {
-  const { callbackUrl } = await props.searchParams;
+```ts
+import Link from 'next/link';
+import { auth } from '@/auth';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { SignOutUser } from '@/lib/actions/user.actions';
+
+const UserButton = async () => {
+  return <div>User Button</div>;
+};
+
+export default UserButton;
 ```
 
-Now, change the redirect to the following:
+We are bringing in a bunch of UI components as well as the `SignOutUser` action from the `user.actions` file and the auth object from the `auth.ts` file.
+
+Then we have an async function that will return a div with the text `User Button`. Make sure you make the function async.
+
+Let's bring it into the `components/shared/header/menu.tsx` file:
 
 ```tsx
-if (session) {
-  return redirect(callbackUrl || '/');
-}
+import UserButton from './user-button';
 ```
 
-If there is a callback, it will redirect there first.
-
-We also want to persist the callback when we submit the form. So we will just pass it as a hidden input in the form. In the `app/(auth)/sign-in/sign-in-credentials.tsx` add the following import:
+We want to put this in two places. In the regular menu and the sheet menu. Let's start with the regular menu. Replace the current sign in button with the user button:
 
 ```tsx
-import { useSearchParams } from 'next/navigation';
+<nav className='md:flex hidden w-full max-w-xs gap-1'>
+  <ModeToggle />
+  <Button asChild variant='ghost'>
+    <Link href='/cart'>
+      <ShoppingCart />
+      Cart
+    </Link>
+  </Button>
+  <UserButton /> 👈 Add this line
+</nav>
 ```
 
-This is how we get searchParams from a client component. We don't pass in props like the server component.
-
-Now add the following below the action state:
+Now add it to the sheet menu right under the cart button:
 
 ```tsx
-const searchParams = useSearchParams();
-const callbackUrl = searchParams.get('callbackUrl') || '/';
+<SheetContent className='flex flex-col items-start'>
+  <ModeToggle />
+  <Button asChild variant='ghost'>
+    <Link href='/cart'>
+      <ShoppingCart />
+      Cart
+    </Link>
+  </Button>
+  <UserButton /> 👈 Add this line
+</SheetContent>
 ```
 
-Now just pass it as a hidden input:
+Now you should see the text "User Button" in the header.
+
+At the top of the function, we want to check for the session and show the sign in if there is not one:
 
 ```tsx
- <form action={action}>
-      <input type='hidden' name='callbackUrl' value={callbackUrl} />
-      // ...
-</form>
+const UserButton = async () => {
+  const session = await auth();
+  if (!session)
+    return (
+      <Link href='/api/auth/signin'>
+        <Button>Sign In</Button>
+      </Link>
+    );
+
+  return <div>User Button</div>;
+};
 ```
 
-Now when we are on a page and sign in, we will be brought back to that page.
+You can log out by deleting the cookie and you should see the sign in button. Test it and then log back in.
 
-You can test this by going to a URL like http://localhost:3000/sign-in?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fshipping-address and signing in and then you should be taken to the shipping-adress page. Which does not exist yet.
+Now we need to show the user's initial and a dropdown with the sign out button.
+
+Add the following between the return statements to get the user name initial:
+
+```tsx
+const firstInitial = session.user?.name?.charAt(0).toUpperCase() ?? '';
+```
+
+Now let's add the output. Add the following to the return statement:
+
+```tsx
+<div className='flex gap-2 items-center'>
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <div className='flex items-center'>
+        <Button
+          variant='ghost'
+          className='relative w-8 h-8 rounded-full ml-2 flex items-center justify-center bg-gray-300'
+        >
+          {firstInitial}
+        </Button>
+      </div>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent className='w-56' align='end' forceMount>
+      <DropdownMenuLabel className='font-normal'>
+        <div className='flex flex-col space-y-1'>
+          <p className='text-sm font-medium leading-none'>
+            {session.user?.name}
+          </p>
+          <p className='text-xs leading-none text-muted-foreground'>
+            {session.user?.email}
+          </p>
+        </div>
+      </DropdownMenuLabel>
+
+      <DropdownMenuItem className='p-0 mb-1'>
+        <form action={SignOutUser} className='w-full'>
+          <Button
+            className='w-full py-4 px-2 h-4 justify-start'
+            variant='ghost'
+          >
+            Sign Out
+          </Button>
+        </form>
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</div>
+```
+
+You should now see the user initial and a dropdown with the sign out button.
+
+Test it out and make sure it works.
