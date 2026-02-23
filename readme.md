@@ -1,139 +1,86 @@
-# User Button & Sign Out
+# Sign Up Form Schema & Action
 
-Now that the sign in is working, we need to change the header up a bit. We will add a user button component with the user initial and a dropdown with the sign out button.
+Now we will create the Zod schema for the sign up form data as well as the action to handle the form submission.
 
-Create a new file at `components/shared/header/user-button.tsx` and add the following code for now:
+## Sign Up Form Schema
+
+Open the file `lib/validator.ts` and add the following code:
 
 ```ts
-import Link from 'next/link';
-import { auth } from '@/auth';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { SignOutUser } from '@/lib/actions/user.actions';
-
-const UserButton = async () => {
-  return <div>User Button</div>;
-};
-
-export default UserButton;
+// Schema for signing up a user
+export const signUpFormSchema = z
+  .object({
+    name: z.string().min(3, 'Name must be at least 3 characters'),
+    email: z.string().min(3, 'Email must be at least 3 characters'),
+    password: z.string().min(3, 'Password must be at least 3 characters'),
+    confirmPassword: z
+      .string()
+      .min(3, 'Confirm password must be at least 3 characters'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  });
 ```
 
-We are bringing in a bunch of UI components as well as the `SignOutUser` action from the `user.actions` file and the auth object from the `auth.ts` file.
+We are creating the schema for the sign up form data. There will be a name, email, password, and confirm password field. The name and email fields are required and must be at least 3 characters long. The password and confirm password fields are required and must be at least 3 characters long. We use the `refine` method on the object itself to check if the password and confirm password fields match. Zod's .refine() expects you to pass a function that returns true or false. If true, the validation succeeds and if false, the validation fails. If the validation fails, Zod adds an error to the field specified in the path (in this case, confirmPassword).
 
-Then we have an async function that will return a div with the text `User Button`. Make sure you make the function async.
+## Sign Up Action
 
-Let's bring it into the `components/shared/header/menu.tsx` file:
+Let's create the action that will handle the sign up form submission. Open the file `lib/actions/user.action.ts` and add the following imports:
 
-```tsx
-import UserButton from './user-button';
+```ts
+import { signInFormSchema, signUpFormSchema } from '../validator';
+import { hashSync } from 'bcrypt-ts-edge';
+import { prisma } from '@/db/prisma';
 ```
 
-We want to put this in two places. In the regular menu and the sheet menu. Let's start with the regular menu. Replace the current sign in button with the user button:
+Here is the code for the action:
 
-```tsx
-<nav className='md:flex hidden w-full max-w-xs gap-1'>
-  <ModeToggle />
-  <Button asChild variant='ghost'>
-    <Link href='/cart'>
-      <ShoppingCart />
-      Cart
-    </Link>
-  </Button>
-  <UserButton /> 👈 Add this line
-</nav>
+```ts
+// Register a new user
+export async function signUp(prevState: unknown, formData: FormData) {
+  try {
+    const user = signUpFormSchema.parse({
+      name: formData.get('name'),
+      email: formData.get('email'),
+      confirmPassword: formData.get('confirmPassword'),
+      password: formData.get('password'),
+    });
+
+    const plainPassword = user.password;
+
+    user.password = hashSync(user.password, 10);
+
+    await prisma.user.create({
+      data: {
+        name: user.name,
+        email: user.email,
+        password: user.password,
+      },
+    });
+
+    await signIn('credentials', {
+      email: user.email,
+      password: plainPassword,
+    });
+
+    return { success: true, message: 'User created successfully' };
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    return {
+      success: false,
+      message: 'Something went wrong',
+    };
+  }
+}
 ```
 
-Now add it to the sheet menu right under the cart button:
+We are using the `signUpFormSchema` schema to validate the form data. We are using the `hashSync` function to hash the password. We are using the `prisma.user.create` method to create a new user. We are using the `signIn` function to sign in the user. We are returning the success status and a message.
 
-```tsx
-<SheetContent className='flex flex-col items-start'>
-  <ModeToggle />
-  <Button asChild variant='ghost'>
-    <Link href='/cart'>
-      <ShoppingCart />
-      Cart
-    </Link>
-  </Button>
-  <UserButton /> 👈 Add this line
-</SheetContent>
-```
+As far as the error, it is very vauge. We can work on this later. First, I want to get the form working.
 
-Now you should see the text "User Button" in the header.
-
-At the top of the function, we want to check for the session and show the sign in if there is not one:
-
-```tsx
-const UserButton = async () => {
-  const session = await auth();
-  if (!session)
-    return (
-      <Link href='/api/auth/signin'>
-        <Button>Sign In</Button>
-      </Link>
-    );
-
-  return <div>User Button</div>;
-};
-```
-
-You can log out by deleting the cookie and you should see the sign in button. Test it and then log back in.
-
-Now we need to show the user's initial and a dropdown with the sign out button.
-
-Add the following between the return statements to get the user name initial:
-
-```tsx
-const firstInitial = session.user?.name?.charAt(0).toUpperCase() ?? '';
-```
-
-Now let's add the output. Add the following to the return statement:
-
-```tsx
-<div className='flex gap-2 items-center'>
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <div className='flex items-center'>
-        <Button
-          variant='ghost'
-          className='relative w-8 h-8 rounded-full ml-2 flex items-center justify-center bg-gray-300'
-        >
-          {firstInitial}
-        </Button>
-      </div>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent className='w-56' align='end' forceMount>
-      <DropdownMenuLabel className='font-normal'>
-        <div className='flex flex-col space-y-1'>
-          <p className='text-sm font-medium leading-none'>
-            {session.user?.name}
-          </p>
-          <p className='text-xs leading-none text-muted-foreground'>
-            {session.user?.email}
-          </p>
-        </div>
-      </DropdownMenuLabel>
-
-      <DropdownMenuItem className='p-0 mb-1'>
-        <form action={SignOutUser} className='w-full'>
-          <Button
-            className='w-full py-4 px-2 h-4 justify-start'
-            variant='ghost'
-          >
-            Sign Out
-          </Button>
-        </form>
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
-</div>
-```
-
-You should now see the user initial and a dropdown with the sign out button.
-
-Test it out and make sure it works.
+In the next lesson, we will create the sign up form.

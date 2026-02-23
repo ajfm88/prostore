@@ -1,8 +1,10 @@
 "use server";
 
 import { signIn, signOut as signOutAuth } from "@/auth";
-import { signInFormSchema } from "../validator";
-import { AuthError } from "next-auth";
+import { signInFormSchema, signUpFormSchema } from "../validator";
+import { hashSync } from "bcrypt-ts-edge";
+import { prisma } from "@/db/prisma";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 
 // Sign in the user with credentials
 export async function signInWithCredentials(
@@ -20,19 +22,54 @@ export async function signInWithCredentials(
 
     return { success: true, message: "Signed in successfully" };
   } catch (error) {
-    if (error instanceof AuthError) {
-      switch (error.type) {
-        case "CredentialsSignin":
-          return { success: false, message: "Invalid email or password" };
-        default:
-          return { success: false, message: "Something went wrong" };
-      }
+    if (isRedirectError(error)) {
+      throw error;
     }
-    throw error; // Re-throw other errors (like redirects)
+    return { success: false, message: "Invalid email or password" };
   }
 }
 
 // Sign the user out
 export async function signOut() {
   await signOutAuth();
+}
+
+// Register a new user
+export async function signUp(prevState: unknown, formData: FormData) {
+  try {
+    const user = signUpFormSchema.parse({
+      name: formData.get("name"),
+      email: formData.get("email"),
+      password: formData.get("password"),
+      confirmPassword: formData.get("confirmPassword"),
+    });
+
+    const plainPassword = user.password;
+
+    user.password = hashSync(user.password, 10);
+
+    await prisma.user.create({
+      data: {
+        name: user.name,
+        email: user.email,
+        password: user.password,
+      },
+    });
+
+    await signIn("credentials", {
+      email: user.email,
+      password: plainPassword,
+    });
+
+    return { success: true, message: "User created successfully" };
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    return {
+      success: false,
+      message: "Something went wrong",
+    };
+  }
 }

@@ -8,7 +8,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SignOutUser } from "@/lib/actions/user.actions";
+import { signOut } from "@/lib/actions/user.actions";
 
 const UserButton = async () => {
   const session = await auth();
@@ -48,7 +48,7 @@ const UserButton = async () => {
           </DropdownMenuLabel>
 
           <DropdownMenuItem className="p-0 mb-1">
-            <form action={SignOutUser} className="w-full">
+            <form action={signOut} className="w-full">
               <Button
                 className="w-full py-4 px-2 h-4 justify-start"
                 variant="ghost"
