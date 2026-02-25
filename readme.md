@@ -1,213 +1,108 @@
-# Sign Up Form
+# Sign Up Error Handling
 
-We will now create the sign up page and form.
+Our registration form is working, but we need to handle errors more gracefully. Let's go into the `lib/actions/user.actions.ts` file and do some experiments. In the catch block, add the following:
 
-Create a new file at `app/(auth)/sign-up/page.tsx`. You can copy the code from the sign in form and edit it or just use this code:
+```ts
+console.log(error.name);
+console.log(error.code);
+console.log(error.errors);
+console.log(error.meta?.target)
+```
 
-```tsx
-import { Metadata } from 'next';
-import Image from 'next/image';
-import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { APP_NAME } from '@/lib/constants';
-import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
+Now remove the `required` attribute from the name and email inputs and change the email type to "text" temporarily in the sign up form and try to register a user without a name and email. You will see something like this:
 
-export const metadata: Metadata = {
-  title: 'Sign Up',
-};
+```
+ZodError
 
-const SignUp = async (props: {
-  searchParams: Promise<{
-    callbackUrl: string;
-  }>;
-}) => {
-  const searchParams = await props.searchParams;
+undefined
 
-  const { callbackUrl } = searchParams;
+[
+    {
+    code: 'too_small',
+    minimum: 3,
+    type: 'string',
+    inclusive: true,
+    exact: false,
+    message: 'Name must be at least 3 characters',
+    path: [ 'name' ]
+  },
+  {
+    validation: 'email',
+    code: 'invalid_string',
+    message: 'Invalid email address',
+    path: [ 'email' ]
+  }
+]
+```
 
-  const session = await auth();
+Now, let's go back to the browser and try to register a user with an email that already exists and look in the server console/terminal. You will see something like this:
 
-  if (session) {
-    return redirect(callbackUrl || '/');
+```
+PrismaClientKnownRequestError
+
+P2002
+
+Invalid `prisma.user.create()` invocation:
+Unique constraint failed on the fields: (`email`)
+```
+
+This gives us some info we can use for an error handler. 
+
+Let's create an error handler. Open the file `lib/utils.ts` and add the following:
+
+```ts
+// Format Errors
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function formatError(error: any): string {
+  if (error.name === 'ZodError') {
+    // Handle Zod error
+    const fieldErrors = Object.keys(error.errors).map((field) => {
+      const message = error.errors[field].message;
+      return typeof message === 'string' ? message : JSON.stringify(message);
+    });
+
+    return fieldErrors.join('. ');
+  } else if (
+    error.name === 'PrismaClientKnownRequestError' &&
+    error.code === 'P2002'
+  ) {
+    // Handle Prisma error
+    const field = error.meta?.target ? error.meta.target[0] : 'Field';
+    return `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`;
+  } else {
+    // Handle other errors
+    return typeof error.message === 'string'
+      ? error.message
+      : JSON.stringify(error.message);
+  }
+}
+
+```
+
+I used the "// eslint-disable-next-line @typescript-eslint/no-explicit-any" comment because I want to use the `any` type without any hassle from eslint. To include the types for this was way more complicated than I'd like.
+
+Here, we are checking for two types of errors: `ZodError` and `PrismaClientKnownRequestError`. If the error is a `ZodError`, we format the error message by joining the error messages for each field. If the error is a `PrismaClientKnownRequestError` and the error code is `P2002`, we format the error message by capitalizing the first letter of the field name that caused the uniqueness error. If the error is neither a `ZodError` nor a `PrismaClientKnownRequestError`, we return the error message as a string.
+
+Now bring it into the `lib/actions/user.actions.ts` file and update the catch block as follows:
+
+```ts
+import { formatError } from '../utils';
+// ...
+
+try {
+  //...
+} catch (error) {
+  if (isRedirectError(error)) {
+    throw error;
   }
 
-  return (
-    <div className='w-full max-w-md mx-auto'>
-      <Card>
-        <CardHeader className='space-y-4'>
-          <Link href='/' className='flex-center'>
-            <Image
-              priority={true}
-              src='/images/logo.svg'
-              width={100}
-              height={100}
-              alt={`${APP_NAME} logo`}
-            />
-          </Link>
-          <CardTitle className='text-center'>Create Account</CardTitle>
-          <CardDescription className='text-center'>
-            Enter your information below to create your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent className='space-y-4'>{/* FORM HERE */}</CardContent>
-      </Card>
-    </div>
-  );
-};
-
-export default SignUp;
-```
-
-We are pretty much doing the same thing as the sign in page. We are getting the callback url from the search params and checking if the user is already signed in. If they are, we redirect them to the callback url or the home page.
-
-Now let's create the form. Create a new file at `app/(auth)/sign-up/signup-form.tsx`. Again, you can copy from the `credentials-signin-form.tsx` and edit it or just use this code:
-
-```tsx
-'use client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { signUpDefaultValues } from '@/lib/constants';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
-import { signUp } from '@/lib/actions/user.actions';
-
-const SignUpForm = () => {
-  const [data, action] = useActionState(signUp, {
-    message: '',
+  return {
     success: false,
-  });
-
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
-
-  const SignUpButton = () => {
-    const { pending } = useFormStatus();
-    return (
-      <Button disabled={pending} className='w-full' variant='default'>
-        {pending ? 'Submitting...' : 'Sign Up'}
-      </Button>
-    );
+    message: formatError(error), // Change this line
   };
-
-  return (
-    <form action={action}>
-      <input type='hidden' name='callbackUrl' value={callbackUrl} />
-      <div className='space-y-6'>
-        <div>
-          <Label htmlFor='name'>Name</Label>
-          <Input
-            id='name'
-            name='name'
-            required
-            type='text'
-            defaultValue={signUpDefaultValues.name}
-            autoComplete='name'
-          />
-        </div>
-        <div>
-          <Label htmlFor='email'>Email</Label>
-          <Input
-            id='email'
-            name='email'
-            required
-            type='email'
-            defaultValue={signUpDefaultValues.email}
-            autoComplete='email'
-          />
-        </div>
-        <div>
-          <Label htmlFor='password'>Password</Label>
-          <Input
-            id='password'
-            name='password'
-            required
-            type='password'
-            defaultValue={signUpDefaultValues.password}
-            autoComplete='current-password'
-          />
-        </div>
-        <div>
-          <Label htmlFor='confirmPassword'>Confirm Password</Label>
-          <Input
-            id='confirmPassword'
-            name='confirmPassword'
-            required
-            type='password'
-            defaultValue={signUpDefaultValues.confirmPassword}
-            autoComplete='current-password'
-          />
-        </div>
-        <div>
-          <SignUpButton />
-        </div>
-
-        {!data.success && (
-          <div className='text-center text-destructive'>{data.message}</div>
-        )}
-
-        <div className='text-sm text-center text-muted-foreground'>
-          Already have an account?{' '}
-          <Link
-            target='_self'
-            className='link'
-            href={`/sign-in?callbackUrl=${callbackUrl}`}
-          >
-            Sign In
-          </Link>
-        </div>
-      </div>
-    </form>
-  );
-};
-
-export default SignUpForm;
+}
 ```
 
-This form is similar to the sign in form. We are using the `useActionState` hook to handle the form state and the `useFormStatus` hook to handle the form status. We are also using the `useSearchParams` hook to get the callback url from the search params.
-We need to add the `signUpDefaultValues` constant to the `lib/constants.ts` file. Add this code to the file:
+Now you should get a more user-friendly error message.
 
-```ts
-export const signUpDefaultValues = {
-  name: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-};
-```
-
-Fill it with what you want. I will add the following:
-
-```ts
-export const signUpDefaultValues = {
-  name: 'Steve Smith',
-  email: 'steve@example.com',
-  password: 'password',
-  confirmPassword: 'password',
-};
-```
-
-Now let's add the sign up form to the sign up page. Open the `app/(auth)/sign-up/page.tsx` file and add the following code:
-
-```tsx
-import SignUpForm from './signup-form';
-```
-
-```tsx
-<CardContent className='space-y-4'>
-  <SignUpForm />
-</CardContent>
-```
-
-Test it with an email that is already taken such as 'admin@example.com'. You should see the the error 'Something Went Wrong'. Like I said, we will address this message soon.
-
-Now try with a new email. You should get registered and logged in.
+You can put the required attribute back to the inputs.
