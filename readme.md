@@ -1,76 +1,121 @@
-# Customizing the Token With The JWT Callback
+# Section Intro
 
-So we have a working authentication system that sends a JWT token to the client. However, right now, that token contains just the name and email. I want to customize it to also have the `role`. We also want to check if the user has no name and use their email as their name if so. We also want to handle session updates such as a name change. To do this, we need to add a `jwt` callback.
+This section is all about adding and removing items from the cart. We'll have a table in the database that represents the cart and the products within it. So we need to create a Prisma schema and model for that.
 
-## `jwt` callback
+Now since we're going to allow guests to add products to the cart, we need a way to link them to their cart so we're going to write some code in the NextAuth callback to add a 'sessionCartId' that will link the user to their cart in the database.
 
-Open the `auth.ts` file and add a `jwt` callback function.
+Then we'll be creating the add to cart component for the UI and create an action to add the item to the cart, which means adding it to the database. Then we want to add the functionality to remove items from the cart as well.
 
-```typescript
- async jwt({ token, user, trigger, session }: any) {
-      // Assign user fields to token
-      if (user) {
-        token.role = user.role;
+We need to create actions to add and remove to and from the cart.
 
-        // If user has no name, use email as their default name
-        if (user.name === 'NO_NAME') {
-          token.name = user.email!.split('@')[0];
+We're also going to make our cart button dynamic in that once we add a product, the button will change to show an add and remove quantity selection.
 
-          // Update the user in the database with the new name
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { name: token.name },
-          });
-        }
-      }
+We're going to use the `useTransition` hook to show a loading state while the action is running.
 
-      // Handle session updates (e.g., name change)
-      if (session?.user.name && trigger === 'update') {
-        token.name = session.user.name;
-      }
+# Cart Schema and Model
 
-      return token;
-    },
-```
+We are going to prepare our data for the shopping cart. We will create a Zod schema as well as our Prisma schema to prepare the database.
 
-We are checking for the user and assigning the role to the token. We are also checking for the user's name and if it is `NO_NAME`, we are setting the name to the user's email address. We are also updating the user's name in the database. This is mainly for the magic link login we will implement later. Finally, we are checking if the session has a user name and if the trigger is `update`, we are setting the token's name to the session's user name.
+## Item Schema
 
-### The `session` callback
-
-The `jwt` callback runs before the `session` callback. Since we added a custom `jwt` callback, we need to manually assign the user's ID, name, and role to the session. So now, in the `session` callback, we need to add the following:
+Let's add the Zod schema for the items in the cart. Open the `lib/validator.ts` file and add the following schema:
 
 ```typescript
-async session ({ session, token, trigger }: any) {
-  // Map the token data to the session object
-  session.user.id = token.id;
-  session.user.name = token.name; // 👈 Add this line
-  session.user.role = token.role; // 👈 Add this line
-
-  // Optionally handle session updates (like name change)
-  if (trigger === 'update' && token.name) {
-    session.user.name = token.name;
-  }
-
-  // Return the updated session object
-  return session;
-},
-
+// Cart
+export const cartItemSchema = z.object({
+  productId: z.string().min(1, "Product is required"),
+  name: z.string().min(1, "Name is required"),
+  slug: z.string().min(1, "Slug is required"),
+  qty: z.number().int().nonnegative("Quantity must be a non-negative number"),
+  image: z.string().min(1, "Image is required"),
+  price: z
+    .number()
+    .refine(
+      (value) => /^\d+(\.\d{2})?$/.test(Number(value).toFixed(2)),
+      "Price must have exactly two decimal places (e.g., 49.99)",
+    ),
+});
 ```
 
-We are mapping the token data to the session object. We are also checking if the trigger is `update` and if the token has a name, we are setting the session's user name to the token's name.
+This schema will be used to validate the cart items when we get the cart.
 
-If you log in and go to `/api/auth/session`, you should see something like this:
+## Cart Schema
 
-```json
-{
-  "user": {
-    "name": "John",
-    "email": "admin@example.com",
-    "id": "9dfc5834-095d-4a34-a072-c030bd55d9e0",
-    "role": "admin"
-  },
-  "expires": "2024-11-20T19:23:49.078Z"
+Let's add the schema for the cart itself. Open the `lib/validator.ts` file and add the following schema:
+
+```typescript
+export const insertCartSchema = z.object({
+  items: z.array(cartItemSchema),
+  itemsPrice: currency,
+  totalPrice: currency,
+  shippingPrice: currency,
+  taxPrice: currency,
+  sessionCartId: z.string().min(1, "Session cart id is required"),
+  userId: z.string().optional().nullable(),
+});
+```
+
+## Add The Types
+
+Let's add a new type. Open the `types/index.ts` file and add the following types:
+
+```typescript
+import {
+  cartItemSchema,
+  insertCartSchema,
+  insertProductSchema,
+} from "@/lib/validator";
+```
+
+```typescript
+export type Cart = z.infer<typeof insertCartSchema>;
+export type CartItem = z.infer<typeof cartItemSchema>;
+```
+
+Now we can use the `CartItem` type in our application.
+
+## Prisma Schema/Model
+
+Let's add the Prisma schema. Open the `prisma/schema.prisma` file and add the following:
+
+```prisma
+model Cart {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String?  @db.Uuid
+  sessionCartId String
+  items         Json[]   @default([]) @db.Json
+  itemsPrice    Decimal  @db.Decimal(12, 2)
+  shippingPrice Decimal  @db.Decimal(12, 2)
+  taxPrice      Decimal  @db.Decimal(12, 2)
+  totalPrice    Decimal  @db.Decimal(12, 2)
+  createdAt     DateTime @default(now()) @db.Timestamp(6)
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "cart_userId_user_id_fk")
 }
 ```
 
-Also, the JWT now includes the user's ID, name, and role so that we can access them on the client-side. If you try and paste the token in [jwt.io](https://jwt.io/), it will not show you the payload because it's encrypted. However, it is decrypted on the client-side in our app.
+Since there is a relationship between the `Cart` and `User` models, also add the following to the `User` model:
+
+```prisma
+model User {
+  // ... other fields
+  Cart          Cart[]
+}
+```
+
+Let's generate the Prisma client. Open the terminal and run the following command:
+
+```bash
+npx prisma generate
+```
+
+This will generate the Prisma client.
+
+Now, let's run the migration:
+
+```bash
+npx prisma migrate dev --name add-cart
+```
+
+This will create a new migration file and apply the changes to the database.
+
+If you open up Prisma Studio, you will see the new `Cart` model.
