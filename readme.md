@@ -1,121 +1,250 @@
-# Section Intro
+# Add To Cart Component
 
-This section is all about adding and removing items from the cart. We'll have a table in the database that represents the cart and the products within it. So we need to create a Prisma schema and model for that.
+Let's start creating the `AddToCart` component. This component will be used to add items to the cart on the product page. It will call an action to add the item to the cart. Right now I just want to create the component and connect it to the action. For now, it will just say something like "Add to cart".
 
-Now since we're going to allow guests to add products to the cart, we need a way to link them to their cart so we're going to write some code in the NextAuth callback to add a 'sessionCartId' that will link the user to their cart in the database.
+## `toast` Component From ShadCN
 
-Then we'll be creating the add to cart component for the UI and create an action to add the item to the cart, which means adding it to the database. Then we want to add the functionality to remove items from the cart as well.
+We will be using the `toast` component from ShadCN. This is a component that will display a notification to the user. We will use this to notify the user when an item is added to the cart.
 
-We need to create actions to add and remove to and from the cart.
+Install the component by running the following command:
 
-We're also going to make our cart button dynamic in that once we add a product, the button will change to show an add and remove quantity selection.
+```bash
+npx shadcn@latest add toast
+```
 
-We're going to use the `useTransition` hook to show a loading state while the action is running.
+We need to add the container for the toast component. Add the following to the `app/layout.tsx` file:
 
-# Cart Schema and Model
+```tsx
+import { Toaster } from '@/components/ui/toaster';
+```
 
-We are going to prepare our data for the shopping cart. We will create a Zod schema as well as our Prisma schema to prepare the database.
+Embed it right below the `{children}` tag:
 
-## Item Schema
+```tsx
+<ThemeProvider
+  attribute='class'
+  defaultTheme='light'
+  enableSystem
+  disableTransitionOnChange
+>
+  {children}
+  <Toaster />
+</ThemeProvider>
+```
 
-Let's add the Zod schema for the items in the cart. Open the `lib/validator.ts` file and add the following schema:
+## Add To Cart Component
 
-```typescript
-// Cart
-export const cartItemSchema = z.object({
-  productId: z.string().min(1, "Product is required"),
-  name: z.string().min(1, "Name is required"),
-  slug: z.string().min(1, "Slug is required"),
-  qty: z.number().int().nonnegative("Quantity must be a non-negative number"),
-  image: z.string().min(1, "Image is required"),
-  price: z
-    .number()
-    .refine(
-      (value) => /^\d+(\.\d{2})?$/.test(Number(value).toFixed(2)),
-      "Price must have exactly two decimal places (e.g., 49.99)",
+Create a new file called `add-to-cart.tsx` in the `components/shared/product` folder and add the following for now:
+
+```tsx
+'use client';
+
+import { CartItem } from '@/types';
+
+const AddToCart = ({ item }: { item: Omit<CartItem, 'cartId'> }) => {
+  return <>Add To Cart</>;
+};
+
+export default AddToCart;
+```
+
+We made it a client component.
+
+We are using the `CartItem` type from the `types.ts` file. We are using the `Omit` utility type to remove the `cartId` property from the `CartItem` type.
+
+Bring it into the product page. Open the `app/(root)/product/[slug]/page.tsx` file and add the following import:
+
+```tsx
+import AddToCart from '@/components/shared/product/add-to-cart';
+```
+
+Replace this code:
+
+```tsx
+{
+  product.stock > 0 && (
+    <div className=' flex-center'>
+      <Button className='w-full'>Add to cart</Button>
+    </div>
+  );
+}
+```
+
+With this code:
+
+```tsx
+{
+  product.stock > 0 && (
+    <div className=' flex-center'>
+      <AddToCart
+        item={{
+          productId: product.id,
+          name: product.name,
+          slug: product.slug,
+          price: product.price,
+          qty: 1,
+          image: product.images![0],
+        }}
+      />
+    </div>
+  );
+}
+```
+
+## Component Logic
+
+Now we need to go into the `AddToCart` component and add the logic. This will be a very dynamic component. It will be able to add and remove the item from the cart. We will be using the `useTransition` hook from React, which will allow us to show a loading state while the item is being added or removed to and from the cart. This is not something that you need to do, but it makes for a better user experience. This course includs some of the more advanced features of React.
+
+We will also implment the `toast` component for notifications. So we will add to this as we go.
+
+For now, add the following imports:
+
+```tsx
+import { Button } from '@/components/ui/button';
+import { ToastAction } from '@/components/ui/toast';
+import { useToast } from '@/hooks/use-toast';
+import { round2 } from '@/lib/utils';
+import { CartItem } from '@/types';
+import { Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+```
+
+Pretty self-explanatory. We are importing our ShadCN components, the types, some icons, the `useRouter` , and the `useToast` hook.
+
+Let's add the initializations and state right above the return:
+
+```tsx
+const router = useRouter();
+const { toast } = useToast();
+```
+
+Under that, in the return let's add the button:
+
+```tsx
+return (
+  <Button className='w-full' type='button' onClick={handleAddToCart}>
+    <Plus />
+    Add to cart
+  </Button>
+);
+```
+
+Finally, add the `handleAddToCart` function:
+
+```tsx
+const handleAddToCart = async () => {
+  // Execute the addItemToCart action
+  const res = await addItemToCart(item);
+
+  // Display appropriate toast message based on the result
+  if (!res.success) {
+    toast({
+      variant: 'destructive',
+      description: res.message,
+    });
+    return;
+  }
+
+  toast({
+    description: `${item.name} added to the cart`,
+    action: (
+      <ToastAction
+        className='bg-primary text-white hover:bg-gray-800'
+        onClick={() => router.push('/cart')}
+        altText='Go to cart'
+      >
+        Go to cart
+      </ToastAction>
     ),
-});
+  });
+};
 ```
 
-This schema will be used to validate the cart items when we get the cart.
+We have not created the `addItemToCart` action yet, but we will do that next. We will then call it. If we get a successful response, we will display a toast message. If we get an error, we will display a toast error.
 
-## Cart Schema
+Here is the whole AddToCart component:
 
-Let's add the schema for the cart itself. Open the `lib/validator.ts` file and add the following schema:
+```tsx
+'use client';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
+import { Plus } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
+import { addItemToCart } from '@/lib/actions/cart.actions';
+import { CartItem } from '@/types';
 
-```typescript
-export const insertCartSchema = z.object({
-  items: z.array(cartItemSchema),
-  itemsPrice: currency,
-  totalPrice: currency,
-  shippingPrice: currency,
-  taxPrice: currency,
-  sessionCartId: z.string().min(1, "Session cart id is required"),
-  userId: z.string().optional().nullable(),
-});
+const AddToCart = ({ item }: { item: CartItem; }) => {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const handleAddToCart = async () => {
+    // Execute the addItemToCart action
+    const res = await addItemToCart(item);
+
+    // Display appropriate toast message based on the result
+    if (!res.success) {
+      toast({
+        variant: 'destructive',
+        description: res.message,
+      });
+      return;
+    }
+
+    toast({
+      description: `${item.name} added to the cart`,
+      action: (
+        <ToastAction
+          className='bg-primary text-white hover:bg-gray-800'
+          onClick={() => router.push('/cart')}
+          altText='Go to cart'
+        >
+          Go to cart
+        </ToastAction>
+      ),
+    });
+};
+
+  return <Button className='w-full' type='button' onClick={ handleAddToCart }>Add To Cart</Button>;
+};
+
+export default AddToCart;
+
 ```
 
-## Add The Types
+## Create The `addItemToCart` Action
 
-Let's add a new type. Open the `types/index.ts` file and add the following types:
+We aren't going to add any functionality to this action yet. We will just create the action and send a response to test the component.
 
-```typescript
-import {
-  cartItemSchema,
-  insertCartSchema,
-  insertProductSchema,
-} from "@/lib/validator";
+Create a new file at `li/actions/cart.actions.ts` and add the following:
+
+```ts
+'use server';
+
+import { CartItem } from '@/types';
+
+export async function addItemToCart (data: CartItem) => {
+  return {
+    success: true,
+    message: 'Item added to the cart',
+  };
+};
 ```
 
-```typescript
-export type Cart = z.infer<typeof insertCartSchema>;
-export type CartItem = z.infer<typeof cartItemSchema>;
+Bring the action into the `AddToCart` component:
+
+```tsx
+import { addItemToCart } from '@/lib/actions/cart.actions';
 ```
 
-Now we can use the `CartItem` type in our application.
+Now click the button and you should see the toast message.
 
-## Prisma Schema/Model
+Temporarily change the success to false:
 
-Let's add the Prisma schema. Open the `prisma/schema.prisma` file and add the following:
-
-```prisma
-model Cart {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId        String?  @db.Uuid
-  sessionCartId String
-  items         Json[]   @default([]) @db.Json
-  itemsPrice    Decimal  @db.Decimal(12, 2)
-  shippingPrice Decimal  @db.Decimal(12, 2)
-  taxPrice      Decimal  @db.Decimal(12, 2)
-  totalPrice    Decimal  @db.Decimal(12, 2)
-  createdAt     DateTime @default(now()) @db.Timestamp(6)
-  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "cart_userId_user_id_fk")
-}
+```ts
+return { success: false, message: 'Something went wrong' };
 ```
 
-Since there is a relationship between the `Cart` and `User` models, also add the following to the `User` model:
+Click the button and the toast should be red.
 
-```prisma
-model User {
-  // ... other fields
-  Cart          Cart[]
-}
-```
-
-Let's generate the Prisma client. Open the terminal and run the following command:
-
-```bash
-npx prisma generate
-```
-
-This will generate the Prisma client.
-
-Now, let's run the migration:
-
-```bash
-npx prisma migrate dev --name add-cart
-```
-
-This will create a new migration file and apply the changes to the database.
-
-If you open up Prisma Studio, you will see the new `Cart` model.
+Now that we have the component working, let's start to add the logic to add the item to the cart.
