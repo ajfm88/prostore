@@ -1,250 +1,64 @@
-# Add To Cart Component
+# Set Session Cart ID In Cookie
 
-Let's start creating the `AddToCart` component. This component will be used to add items to the cart on the product page. It will call an action to add the item to the cart. Right now I just want to create the component and connect it to the action. For now, it will just say something like "Add to cart".
+So we have our `AddToCart` component and the begining of the `addItemToCart` action. What I want to do now is make it so that when we come to the app, our session cart ID is created and added as a cookie. This will be the user's cart identifier. Because in our action, we need to check for that session cart id in the cookie in order to get the cart items from the database.
 
-## `toast` Component From ShadCN
+We're going to add this logic in a callback in the `auth.ts` file called `authorize`, which invokes when a user needs authorization using middleware. You can read more about this callback here - https://authjs.dev/reference/nextjs#authorized. 
 
-We will be using the `toast` component from ShadCN. This is a component that will display a notification to the user. We will use this to notify the user when an item is added to the cart.
+Since this callback uses middleware, It will only be called if we add a middleware file and reference the auth file.
 
-Install the component by running the following command:
+Create a new file in the root called `middleware.ts` and add the following:
 
-```bash
-npx shadcn@latest add toast
+```ts
+export { auth as middleware } from '@/auth';
 ```
 
-We need to add the container for the toast component. Add the following to the `app/layout.tsx` file:
+We are exporting our auth function from the `auth.ts` file as middleware. Now we can add and use the `authorize` callback and it will run on every page request unless we specify that we don't want the middleware used on a certain page.
 
-```tsx
-import { Toaster } from '@/components/ui/toaster';
-```
+Create a new callback in the `auth.ts` file:
 
-Embed it right below the `{children}` tag:
+```ts
+authorized({ request, auth }: any) {
+  // Check for cart cookie
+  if (!request.cookies.get('sessionCartId')) {
+  	// Generate cart cookie
+    const sessionCartId = crypto.randomUUID(); 
 
-```tsx
-<ThemeProvider
-  attribute='class'
-  defaultTheme='light'
-  enableSystem
-  disableTransitionOnChange
->
-  {children}
-  <Toaster />
-</ThemeProvider>
-```
+    // Clone the request headers
+    const newRequestHeaders = new Headers(request.headers); 
 
-## Add To Cart Component
-
-Create a new file called `add-to-cart.tsx` in the `components/shared/product` folder and add the following for now:
-
-```tsx
-'use client';
-
-import { CartItem } from '@/types';
-
-const AddToCart = ({ item }: { item: Omit<CartItem, 'cartId'> }) => {
-  return <>Add To Cart</>;
-};
-
-export default AddToCart;
-```
-
-We made it a client component.
-
-We are using the `CartItem` type from the `types.ts` file. We are using the `Omit` utility type to remove the `cartId` property from the `CartItem` type.
-
-Bring it into the product page. Open the `app/(root)/product/[slug]/page.tsx` file and add the following import:
-
-```tsx
-import AddToCart from '@/components/shared/product/add-to-cart';
-```
-
-Replace this code:
-
-```tsx
-{
-  product.stock > 0 && (
-    <div className=' flex-center'>
-      <Button className='w-full'>Add to cart</Button>
-    </div>
-  );
-}
-```
-
-With this code:
-
-```tsx
-{
-  product.stock > 0 && (
-    <div className=' flex-center'>
-      <AddToCart
-        item={{
-          productId: product.id,
-          name: product.name,
-          slug: product.slug,
-          price: product.price,
-          qty: 1,
-          image: product.images![0],
-        }}
-      />
-    </div>
-  );
-}
-```
-
-## Component Logic
-
-Now we need to go into the `AddToCart` component and add the logic. This will be a very dynamic component. It will be able to add and remove the item from the cart. We will be using the `useTransition` hook from React, which will allow us to show a loading state while the item is being added or removed to and from the cart. This is not something that you need to do, but it makes for a better user experience. This course includs some of the more advanced features of React.
-
-We will also implment the `toast` component for notifications. So we will add to this as we go.
-
-For now, add the following imports:
-
-```tsx
-import { Button } from '@/components/ui/button';
-import { ToastAction } from '@/components/ui/toast';
-import { useToast } from '@/hooks/use-toast';
-import { round2 } from '@/lib/utils';
-import { CartItem } from '@/types';
-import { Plus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-```
-
-Pretty self-explanatory. We are importing our ShadCN components, the types, some icons, the `useRouter` , and the `useToast` hook.
-
-Let's add the initializations and state right above the return:
-
-```tsx
-const router = useRouter();
-const { toast } = useToast();
-```
-
-Under that, in the return let's add the button:
-
-```tsx
-return (
-  <Button className='w-full' type='button' onClick={handleAddToCart}>
-    <Plus />
-    Add to cart
-  </Button>
-);
-```
-
-Finally, add the `handleAddToCart` function:
-
-```tsx
-const handleAddToCart = async () => {
-  // Execute the addItemToCart action
-  const res = await addItemToCart(item);
-
-  // Display appropriate toast message based on the result
-  if (!res.success) {
-    toast({
-      variant: 'destructive',
-      description: res.message,
+    // Create a new response and add the new headers
+    const response = NextResponse.next({
+      request: {
+        headers: newRequestHeaders,
+      },
     });
-    return;
+
+    // Set the newly generated sessionCartId in the response cookies
+    response.cookies.set('sessionCartId', sessionCartId);
+
+    // Return the response with the sessionCartId set
+    return response;
+  } else {
+    return true;
   }
-
-  toast({
-    description: `${item.name} added to the cart`,
-    action: (
-      <ToastAction
-        className='bg-primary text-white hover:bg-gray-800'
-        onClick={() => router.push('/cart')}
-        altText='Go to cart'
-      >
-        Go to cart
-      </ToastAction>
-    ),
-  });
-};
+},
 ```
 
-We have not created the `addItemToCart` action yet, but we will do that next. We will then call it. If we get a successful response, we will display a toast message. If we get an error, we will display a toast error.
-
-Here is the whole AddToCart component:
-
-```tsx
-'use client';
-import { Button } from '@/components/ui/button';
-import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { ToastAction } from '@/components/ui/toast';
-import { addItemToCart } from '@/lib/actions/cart.actions';
-import { CartItem } from '@/types';
-
-const AddToCart = ({ item }: { item: CartItem; }) => {
-  const router = useRouter();
-  const { toast } = useToast();
-
-  const handleAddToCart = async () => {
-    // Execute the addItemToCart action
-    const res = await addItemToCart(item);
-
-    // Display appropriate toast message based on the result
-    if (!res.success) {
-      toast({
-        variant: 'destructive',
-        description: res.message,
-      });
-      return;
-    }
-
-    toast({
-      description: `${item.name} added to the cart`,
-      action: (
-        <ToastAction
-          className='bg-primary text-white hover:bg-gray-800'
-          onClick={() => router.push('/cart')}
-          altText='Go to cart'
-        >
-          Go to cart
-        </ToastAction>
-      ),
-    });
-};
-
-  return <Button className='w-full' type='button' onClick={ handleAddToCart }>Add To Cart</Button>;
-};
-
-export default AddToCart;
-
-```
-
-## Create The `addItemToCart` Action
-
-We aren't going to add any functionality to this action yet. We will just create the action and send a response to test the component.
-
-Create a new file at `li/actions/cart.actions.ts` and add the following:
+Be sure to add the following imports as well:
 
 ```ts
-'use server';
-
-import { CartItem } from '@/types';
-
-export async function addItemToCart (data: CartItem) => {
-  return {
-    success: true,
-    message: 'Item added to the cart',
-  };
-};
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 ```
 
-Bring the action into the `AddToCart` component:
+We are checking if there is a `sessionCartId` cookie. If not, we generate a new one using a random UUID and set it in the response cookies.This ID will be used to identify the cart for this specific session.
 
-```tsx
-import { addItemToCart } from '@/lib/actions/cart.actions';
-```
+Next, The headers from the current request are cloned into a new Headers object. This is necessary because NextResponse.next() requires a complete request object, including headers.
 
-Now click the button and you should see the toast message.
+A new NextResponse object is created to handle the request. NextResponse.next() allows the request to continue to its intended destination but with modifications (like setting cookies).
 
-Temporarily change the success to false:
+Then the newly generated sessionCartId is added as a cookie in the response. This ensures the cookie is available for subsequent requests.
 
-```ts
-return { success: false, message: 'Something went wrong' };
-```
+We then return the response. If the sessionCartId cookie already exists, the function simply returns true.
 
-Click the button and the toast should be red.
-
-Now that we have the component working, let's start to add the logic to add the item to the cart.
+Now, go to the app and in the devtools->application tab you should see the `sessionCartId` cookie.
