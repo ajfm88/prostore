@@ -1,64 +1,214 @@
-# Set Session Cart ID In Cookie
+# Get Item For Cart
 
-So we have our `AddToCart` component and the begining of the `addItemToCart` action. What I want to do now is make it so that when we come to the app, our session cart ID is created and added as a cookie. This will be the user's cart identifier. Because in our action, we need to check for that session cart id in the cookie in order to get the cart items from the database.
+We want to be able to add an item to the cart in the database, but first, we have to get the user and find the product in the database. That's what we'll do in this lesson.
 
-We're going to add this logic in a callback in the `auth.ts` file called `authorize`, which invokes when a user needs authorization using middleware. You can read more about this callback here - https://authjs.dev/reference/nextjs#authorized. 
-
-Since this callback uses middleware, It will only be called if we add a middleware file and reference the auth file.
-
-Create a new file in the root called `middleware.ts` and add the following:
+Open the `lib/actions/cart.actions.ts` and add the following imports:
 
 ```ts
-export { auth as middleware } from '@/auth';
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+import { z } from 'zod';
+import { auth } from '@/auth';
+import { formatError } from '../utils';
+import { cartItemSchema, insertCartSchema } from '../validators';
+import { prisma } from '@/db/prisma';
+import { CartItem } from '@/types';
+import { Prisma } from '@prisma/client';
+import { convertToPlainObject } from '../utils';
 ```
 
-We are exporting our auth function from the `auth.ts` file as middleware. Now we can add and use the `authorize` callback and it will run on every page request unless we specify that we don't want the middleware used on a certain page.
+We are bringing in the validators, utility functions, auth file, cookies, revalidatePath, and the prisma client.
 
-Create a new callback in the `auth.ts` file:
+## Add Item To Cart Action
+
+Let's continue with the `addItemToCart` action. It won't actually add it just yet, but like I said, we need to get the user and get the item.
+
+In the try block, let's start by getting the session cart ID from the cookie and then get the user ID from the session. We will add some logs for testing as well.
+
+Add the following for the `addItemToCart` action:
 
 ```ts
-authorized({ request, auth }: any) {
-  // Check for cart cookie
-  if (!request.cookies.get('sessionCartId')) {
-  	// Generate cart cookie
-    const sessionCartId = crypto.randomUUID(); 
+// Add item to cart in database
+export async function addItemToCart(data: CartItem) => {
+  try {
+    // Check for session cart cookie
+    const sessionCartId = (await cookies()).get('sessionCartId')?.value;
+    if (!sessionCartId) throw new Error('Cart Session not found');
 
-    // Clone the request headers
-    const newRequestHeaders = new Headers(request.headers); 
+    // Get session and user ID
+    const session = await auth();
+    const userId = session?.user?.id ? (session.user.id as string) : undefined;
 
-    // Create a new response and add the new headers
-    const response = NextResponse.next({
-      request: {
-        headers: newRequestHeaders,
-      },
+    // Testing
+    console.log({
+      'Session Cart ID': sessionCartId,
+      'User ID': userId,
     });
 
-    // Set the newly generated sessionCartId in the response cookies
-    response.cookies.set('sessionCartId', sessionCartId);
-
-    // Return the response with the sessionCartId set
-    return response;
-  } else {
-    return true;
+    return {
+      success: true,
+      message: 'Testing Cart',
+    };
+  } catch (error) {
+    return { success: false, message: formatError(error) };
   }
-},
+};
 ```
 
-Be sure to add the following imports as well:
+Now click the add to cart button and you should see the session cart ID and user ID in the console. So far, so good.
+
+## Get User Cart Action
+
+We need to get the user's cart from the database. We will do this in the `getMyCart` action.
+
+Under the `addItemToCart` action, add the following action:
 
 ```ts
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+//  Get user cart from database
+export async function getMyCart() {
+  // Check for session cart cookie
+  const sessionCartId = (await cookies()).get('sessionCartId')?.value;
+  if (!sessionCartId) return undefined;
+
+  // Get session and user ID
+  const session = await auth();
+  const userId = session?.user.id;
+
+  // Get user cart from database
+  const cart = await prisma.cart.findFirst({
+    where: userId ? { userId: userId } : { sessionCartId: sessionCartId },
+  });
+
+  if (!cart) return undefined;
+
+  // Convert Decimal values to strings
+  return convertToPlainObject({
+    ...cart,
+    items: cart.items as CartItem[],
+    itemsPrice: cart.itemsPrice.toString(),
+    totalPrice: cart.totalPrice.toString(),
+    shippingPrice: cart.shippingPrice.toString(),
+    taxPrice: cart.taxPrice.toString(),
+  });
+}
 ```
 
-We are checking if there is a `sessionCartId` cookie. If not, we generate a new one using a random UUID and set it in the response cookies.This ID will be used to identify the cart for this specific session.
+Again we are checking for the session cart ID in the cookie. If it doesn't exist, we return undefined. We are also getting the user ID from the session. We are then using the `prisma` object to find the cart in the database. If the cart doesn't exist, we return undefined. We are then using the `convertToPlainObject` function to convert the data to a plain object.
 
-Next, The headers from the current request are cloned into a new Headers object. This is necessary because NextResponse.next() requires a complete request object, including headers.
+We are converting the `itemsPrice`, `totalPrice`, `shippingPrice`, and `taxPrice` to strings because we are using the `Decimal` type in the database. We need to fdo this to prevent future TypeScript errors.
 
-A new NextResponse object is created to handle the request. NextResponse.next() allows the request to continue to its intended destination but with modifications (like setting cookies).
+Now back in the `addItemToCart` action, let's get the user cart.
 
-Then the newly generated sessionCartId is added as a cookie in the response. This ensures the cookie is available for subsequent requests.
+```ts
+// Get cart from database
+const cart = await getMyCart();
+// Parse and validate submitted item data
+const item = cartItemSchema.parse(data);
+// Find product in database
+const product = await prisma.product.findFirst({
+  where: { id: item.productId },
+});
+if (!product) throw new Error('Product not found');
 
-We then return the response. If the sessionCartId cookie already exists, the function simply returns true.
+// Testing
+console.log({
+  'Session Cart ID': sessionCartId,
+  'User ID': userId,
+  'Item Requested': item,
+  'Product Found': product,
+  cart: cart,
+});
 
-Now, go to the app and in the devtools->application tab you should see the `sessionCartId` cookie.
+return {
+  success: true,
+  message: 'Testing Cart',
+};
+```
+
+You should see the item requested from the button, the product found in the database and the cart, which right now is undefined.
+
+In the next lesson, we will make it so the item is added to the cart.
+
+Here is the full code for the `addItemToCart` action up to this point:
+
+```ts
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+import { z } from 'zod';
+import { auth } from '@/auth';
+import { formatError } from '../utils';
+import { cartItemSchema, insertCartSchema } from '../validator';
+import { prisma } from '@/db/prisma';
+import { CartItem } from '@/types';
+import { Prisma } from '@prisma/client';
+import { convertToPlainObject, round2 } from '../utils';
+
+// Add item to cart in database
+export const addItemToCart = async (data: z.infer<typeof cartItemSchema>) => {
+  try {
+    // Check for session cart cookie
+    const sessionCartId = (await cookies()).get('sessionCartId')?.value;
+    if (!sessionCartId) throw new Error('Cart Session not found');
+    // Get session and user ID
+    const session = await auth();
+    const userId = session?.user.id as string | undefined;
+    // Get cart from database
+    const cart = await getMyCart();
+    // Parse and validate submitted item data
+    const item = cartItemSchema.parse(data);
+    // Find product in database
+    const product = await prisma.product.findFirst({
+      where: { id: item.productId },
+    });
+    if (!product) throw new Error('Product not found');
+
+    // Testing
+    console.log({
+      'Session Cart ID': sessionCartId,
+      'User ID': userId,
+      'Item Requested': item,
+      'Product Found': product,
+      cart: cart,
+    });
+
+    return {
+      success: true,
+      message: 'Testing Cart',
+    };
+  } catch (error) {
+    return { success: false, message: formatError(error) };
+  }
+};
+
+//  Get user cart from database
+export async function getMyCart() {
+  // Check for session cart cookie
+  const sessionCartId = (await cookies()).get('sessionCartId')?.value;
+  if (!sessionCartId) return undefined;
+
+  // Get session and user ID
+  const session = await auth();
+  const userId = session?.user.id;
+
+  // Get user cart from database
+  const cart = await prisma.cart.findFirst({
+    where: userId ? { userId: userId } : { sessionCartId: sessionCartId },
+  });
+
+  if (!cart) return undefined;
+
+  // Convert Decimal values to strings for compatibility with AddToCart component
+  return convertToPlainObject({
+    ...cart,
+    items: cart.items as CartItem[],
+    itemsPrice: cart.itemsPrice.toString(),
+    totalPrice: cart.totalPrice.toString(),
+    shippingPrice: cart.shippingPrice.toString(),
+    taxPrice: cart.taxPrice.toString(),
+  });
+}
+```
