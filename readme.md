@@ -1,214 +1,96 @@
-# Get Item For Cart
+# Price Calculation & Add Item To Database
 
-We want to be able to add an item to the cart in the database, but first, we have to get the user and find the product in the database. That's what we'll do in this lesson.
+We need to do some calculations on the prices before adding to the database. Let's do that now.
 
-Open the `lib/actions/cart.actions.ts` and add the following imports:
+## `round2`
 
-```ts
-'use server';
+We need a function to round numbers to 2 decimal places.
 
-import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
-import { z } from 'zod';
-import { auth } from '@/auth';
-import { formatError } from '../utils';
-import { cartItemSchema, insertCartSchema } from '../validators';
-import { prisma } from '@/db/prisma';
-import { CartItem } from '@/types';
-import { Prisma } from '@prisma/client';
-import { convertToPlainObject } from '../utils';
-```
-
-We are bringing in the validators, utility functions, auth file, cookies, revalidatePath, and the prisma client.
-
-## Add Item To Cart Action
-
-Let's continue with the `addItemToCart` action. It won't actually add it just yet, but like I said, we need to get the user and get the item.
-
-In the try block, let's start by getting the session cart ID from the cookie and then get the user ID from the session. We will add some logs for testing as well.
-
-Add the following for the `addItemToCart` action:
+Open the `lib/utils.ts` file and add the following function:
 
 ```ts
-// Add item to cart in database
-export async function addItemToCart(data: CartItem) => {
-  try {
-    // Check for session cart cookie
-    const sessionCartId = (await cookies()).get('sessionCartId')?.value;
-    if (!sessionCartId) throw new Error('Cart Session not found');
-
-    // Get session and user ID
-    const session = await auth();
-    const userId = session?.user?.id ? (session.user.id as string) : undefined;
-
-    // Testing
-    console.log({
-      'Session Cart ID': sessionCartId,
-      'User ID': userId,
-    });
-
-    return {
-      success: true,
-      message: 'Testing Cart',
-    };
-  } catch (error) {
-    return { success: false, message: formatError(error) };
+// Round to 2 decimal places
+export const round2 = (value: number | string) => {
+  if (typeof value === "number") {
+    return Math.round((value + Number.EPSILON) * 100) / 100; // avoid rounding errors
+  } else if (typeof value === "string") {
+    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  } else {
+    throw new Error("value is not a number nor a string");
   }
 };
 ```
 
-Now click the add to cart button and you should see the session cart ID and user ID in the console. So far, so good.
+The round2 function takes a number or a string that looks like a number and rounds it to 2 decimal places. It takes in a number or string and rounds both to 2 decimal places. It uses Number.EPSILON, which is a very tiny number that helps avoid rounding errors caused by how computers handle floating-point math. Adding this ensures the number is correctly rounded.
 
-## Get User Cart Action
+value \* 100: This moves the decimal point two places to the right. For example 123.456 → 12345.6
 
-We need to get the user's cart from the database. We will do this in the `getMyCart` action.
+Dividing by 100: This moves the decimal point back to where it was. For example 12346 → 123.46
 
-Under the `addItemToCart` action, add the following action:
+## `calcPrice` Function
 
-```ts
-//  Get user cart from database
-export async function getMyCart() {
-  // Check for session cart cookie
-  const sessionCartId = (await cookies()).get('sessionCartId')?.value;
-  if (!sessionCartId) return undefined;
-
-  // Get session and user ID
-  const session = await auth();
-  const userId = session?.user.id;
-
-  // Get user cart from database
-  const cart = await prisma.cart.findFirst({
-    where: userId ? { userId: userId } : { sessionCartId: sessionCartId },
-  });
-
-  if (!cart) return undefined;
-
-  // Convert Decimal values to strings
-  return convertToPlainObject({
-    ...cart,
-    items: cart.items as CartItem[],
-    itemsPrice: cart.itemsPrice.toString(),
-    totalPrice: cart.totalPrice.toString(),
-    shippingPrice: cart.shippingPrice.toString(),
-    taxPrice: cart.taxPrice.toString(),
-  });
-}
-```
-
-Again we are checking for the session cart ID in the cookie. If it doesn't exist, we return undefined. We are also getting the user ID from the session. We are then using the `prisma` object to find the cart in the database. If the cart doesn't exist, we return undefined. We are then using the `convertToPlainObject` function to convert the data to a plain object.
-
-We are converting the `itemsPrice`, `totalPrice`, `shippingPrice`, and `taxPrice` to strings because we are using the `Decimal` type in the database. We need to fdo this to prevent future TypeScript errors.
-
-Now back in the `addItemToCart` action, let's get the user cart.
+We need to calculate the price of the item. We will do this in the `calcPrice` function. Add this to the `lib/actions/cart.actions.ts` file right above the `addItemToCart` function:
 
 ```ts
-// Get cart from database
-const cart = await getMyCart();
-// Parse and validate submitted item data
-const item = cartItemSchema.parse(data);
-// Find product in database
-const product = await prisma.product.findFirst({
-  where: { id: item.productId },
-});
-if (!product) throw new Error('Product not found');
-
-// Testing
-console.log({
-  'Session Cart ID': sessionCartId,
-  'User ID': userId,
-  'Item Requested': item,
-  'Product Found': product,
-  cart: cart,
-});
-
-return {
-  success: true,
-  message: 'Testing Cart',
+// Calculate cart price based on items
+const calcPrice = (items: z.infer<typeof cartItemSchema>[]) => {
+  const itemsPrice = round2(
+      items.reduce((acc, item) => acc + Number(item.price) * item.qty, 0),
+    ),
+    shippingPrice = round2(itemsPrice > 100 ? 0 : 10),
+    taxPrice = round2(0.15 * itemsPrice),
+    totalPrice = round2(itemsPrice + shippingPrice + taxPrice);
+  return {
+    itemsPrice: itemsPrice.toFixed(2),
+    shippingPrice: shippingPrice.toFixed(2),
+    taxPrice: taxPrice.toFixed(2),
+    totalPrice: totalPrice.toFixed(2),
+  };
 };
 ```
 
-You should see the item requested from the button, the product found in the database and the cart, which right now is undefined.
+This function takes an array of items and returns an object with the total price of the items, the shipping price, the tax price, and the total price. We use the `round2` function to round the prices to 2 decimal places. We will create this in a minute.
 
-In the next lesson, we will make it so the item is added to the cart.
+The shipping price is $10 if the items price is less than or equal to $100.
 
-Here is the full code for the `addItemToCart` action up to this point:
+The tax price is 15% of the items price.
+
+The total price is the sum of the items price, the shipping price, and the tax price.
+
+We return an object with the prices rounded to 2 decimal places.
+
+## Add Item To Database
+
+In the `addItemToCart` function, get rid of the testing logs and the return.
+
+Under the line `if (!product) throw new Error('Product not found');` add the following code:
 
 ```ts
-'use server';
-
-import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
-import { z } from 'zod';
-import { auth } from '@/auth';
-import { formatError } from '../utils';
-import { cartItemSchema, insertCartSchema } from '../validator';
-import { prisma } from '@/db/prisma';
-import { CartItem } from '@/types';
-import { Prisma } from '@prisma/client';
-import { convertToPlainObject, round2 } from '../utils';
-
-// Add item to cart in database
-export const addItemToCart = async (data: z.infer<typeof cartItemSchema>) => {
-  try {
-    // Check for session cart cookie
-    const sessionCartId = (await cookies()).get('sessionCartId')?.value;
-    if (!sessionCartId) throw new Error('Cart Session not found');
-    // Get session and user ID
-    const session = await auth();
-    const userId = session?.user.id as string | undefined;
-    // Get cart from database
-    const cart = await getMyCart();
-    // Parse and validate submitted item data
-    const item = cartItemSchema.parse(data);
-    // Find product in database
-    const product = await prisma.product.findFirst({
-      where: { id: item.productId },
-    });
-    if (!product) throw new Error('Product not found');
-
-    // Testing
-    console.log({
-      'Session Cart ID': sessionCartId,
-      'User ID': userId,
-      'Item Requested': item,
-      'Product Found': product,
-      cart: cart,
-    });
-
-    return {
-      success: true,
-      message: 'Testing Cart',
-    };
-  } catch (error) {
-    return { success: false, message: formatError(error) };
-  }
-};
-
-//  Get user cart from database
-export async function getMyCart() {
-  // Check for session cart cookie
-  const sessionCartId = (await cookies()).get('sessionCartId')?.value;
-  if (!sessionCartId) return undefined;
-
-  // Get session and user ID
-  const session = await auth();
-  const userId = session?.user.id;
-
-  // Get user cart from database
-  const cart = await prisma.cart.findFirst({
-    where: userId ? { userId: userId } : { sessionCartId: sessionCartId },
+if (!cart) {
+  // Create new cart object
+  const newCart = insertCartSchema.parse({
+    userId: userId,
+    items: [item],
+    sessionCartId: sessionCartId,
+    ...calcPrice([item]),
+  });
+  // Add to database
+  await prisma.cart.create({
+    data: newCart,
   });
 
-  if (!cart) return undefined;
+  // Revalidate product page
+  revalidatePath(`/product/${product.slug}`);
 
-  // Convert Decimal values to strings for compatibility with AddToCart component
-  return convertToPlainObject({
-    ...cart,
-    items: cart.items as CartItem[],
-    itemsPrice: cart.itemsPrice.toString(),
-    totalPrice: cart.totalPrice.toString(),
-    shippingPrice: cart.shippingPrice.toString(),
-    taxPrice: cart.taxPrice.toString(),
-  });
+  return {
+    success: true,
+    message: "Item added to cart successfully",
+  };
 }
 ```
+
+We are checking for an existing cart. If it exists, we create a new object with the cart data. We are using the `insertCartSchema` to validate the data. We are using the `calcPrice` function to calculate the price of the item. We will create this in a minute It also includes the `sessionCartId` and the `userId` from the `session` object. We then add it to the database. We then revalidate the product page. We then return a success message.
+
+## Test It Out
+
+Open up Prisma Studio with `npx prisma studio` and check the database. Before clicking the button, there should be nothing in the Cart table. After clicking the button, there should be a new row in the Cart table with the item you added.
