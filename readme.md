@@ -1,168 +1,120 @@
-# Remove Item from Cart Action
+# Dynamic Cart Button
 
-We can now add an item to the cart. Now let's add the ability to remove an item from the cart. We need to create a new action for this.
+We now have an action to remove the items from the cart. Now we are going to edit the add-item-to-cart button to show a quantity and a remove button.
 
-Open the `lib/actions/cart.actions.ts` file and add the following function:
+We need to pass the cart into the button component. So open the product page at `app/(root)/product/[slug]/page.tsx` and let's import our `getMyCart` action:
 
-```ts
-// Remove item from cart in database
-export async function removeItemFromCart (productId: string) {
-  try {
-  } catch (error) {
-    return { success: false, message: formatError(error) };
+```tsx
+import { getMyCart } from '@/lib/actions/cart.actions';
+```
+
+then initialize it above the return:
+
+```tsx
+const ProductDetailsPage = async (
+  props: {
+    params: Promise<{ slug: string }>;
   }
+) => {
+  const params = await props.params;
+
+  const {
+    slug
+  } = params;
+
+  const product = await getProductBySlug(slug)
+  if (!product) notFound();
+
+  const cart = await getMyCart(); //👈 Add this line
+  return (// ...)
+```
+
+Now just pass it into the `AddToCart` component:
+
+```tsx
+<AddToCart
+  cart={cart} // 👈 Add this line
+  item={{
+    productId: product.id,
+    name: product.name,
+    slug: product.slug,
+    price: round2(product.price),
+    qty: 1,
+    image: product.images![0],
+  }}
+/>
+```
+
+Open the `components/shared/product/add-to-cart.tsx` file and add the `cart` prop:
+
+```tsx
+const AddToCart = ({
+  cart,
+  item,
+}: {
+  cart?: Cart;
+  item: Omit<CartItem, 'cartId'>;
+}) => {
+  // ...
 };
 ```
 
-We are passing in a product id to remove.
+Import the `Cart` type, `Minus` icon and the `removeFromCart` action:
 
-We will build this function up in chunks. First, we need to get the session cart id. Add the following code to the try block:
-
-```ts
-// Get session cart id
-const sessionCartId = (await cookies()).get('sessionCartId')?.value;
-if (!sessionCartId) throw new Error('Cart Session not found');
+```tsx
+import { Cart, CartItem } from '@/types';
+import { Plus, Minus } from 'lucide-react';
+import { addItemToCart, removeItemFromCart } from '@/lib/actions/cart.actions';
 ```
 
-Next, we need to get the product from the database:
+## Handle Remove From Cart
 
-```ts
-// Get product
-const product = await prisma.product.findFirst({
-  where: { id: productId },
-});
-if (!product) throw new Error('Product not found');
-```
+Add the following function below the `handleAddToCart` function:
 
-Next, get the user cart:
+```tsx
+// Remove item from cart
+const handleRemoveFromCart = async () => {
+  const res = await removeItemFromCart(item.productId);
 
-```ts
-// Get user cart
-const cart = await getMyCart();
-if (!cart) throw new Error('Cart not found');
-```
+  toast({
+    variant: res.success ? 'default' : 'destructive',
+    description: res.message,
+  });
 
-See if the cart has the item:
-
-```ts
-// Check if cart has item
-const exist = (cart.items as CartItem[]).find((x) => x.productId === productId);
-if (!exist) throw new Error('Item not found');
-```
-
-We need to check if the quantity is 1 and if so, remove the item. If the quantity is more than 1, then we need to decrease the quantity. Add the following code:
-
-```ts
-// Check if cart has only one item
-if (exist.qty === 1) {
-  // Remove item from cart
-  cart.items = (cart.items as CartItem[]).filter(
-    (x) => x.productId !== exist.productId
-  );
-} else {
-  // Decrease quantity of existing item
-  (cart.items as CartItem[]).find((x) => x.productId === productId)!.qty =
-    exist.qty - 1;
-}
-```
-
-Update the database:
-
-```ts
-// Update cart in database
-await prisma.cart.update({
-  where: { id: cart.id },
-  data: {
-    items: cart.items as Prisma.CartUpdateitemsInput[],
-    ...calcPrice(cart.items as CartItem[]),
-  },
-});
-```
-
-We are using the `calcPrice` function to calculate the price of the item.
-
-Revalidate the product page:
-
-```ts
-// Revalidate product page
-revalidatePath(`/product/${product.slug}`);
-```
-
-Return success and message:
-
-```ts
-return {
-  success: true,
-  message: `${product.name}  ${
-    (cart.items as CartItem[]).find((x) => x.productId === productId)
-      ? 'updated in'
-      : 'removed from'
-  } cart successfully`,
+  return;
 };
 ```
 
-We are returning a message with the product name and whether it was updated or removed from the cart.
+We are just calling the `removeItemFromCart` action and showing a toast message.
 
-Here is the full code:
+## Show Remove From Cart
 
-```ts
-// Remove item from cart in database
-export async function removeItemFromCart (productId: string) {
-  try {
-    // Get session cart id
-    const sessionCartId = (await cookies()).get('sessionCartId')?.value;
-    if (!sessionCartId) throw new Error('Cart Session not found');
+We are going to create a variable to let us know if the item exists in the cart. Add the following right above the return statement:
 
-    // Get product
-    const product = await prisma.product.findFirst({
-      where: { id: productId },
-    });
-    if (!product) throw new Error('Product not found');
-
-    // Get user cart
-    const cart = await getMyCart();
-    if (!cart) throw new Error('Cart not found');
-
-    // Check if cart has item
-    const exist = (cart.items as CartItem[]).find(
-      (x) => x.productId === productId
-    );
-    if (!exist) throw new Error('Item not found');
-
-    // Check if cart has only one item
-    if (exist.qty === 1) {
-      // Remove item from cart
-      cart.items = (cart.items as CartItem[]).filter(
-        (x) => x.productId !== exist.productId
-      );
-    } else {
-      // Decrease quantity of existing item
-      (cart.items as CartItem[]).find((x) => x.productId === productId)!.qty =
-        exist.qty - 1;
-    }
-
-    // Update cart in database
-    await prisma.cart.update({
-      where: { id: cart.id },
-      data: {
-        items: cart.items as Prisma.CartUpdateitemsInput[],
-        ...calcPrice(cart.items as CartItem[]),
-      },
-    });
-
-    // Revalidate product page
-    revalidatePath(`/product/${product.slug}`);
-
-    return {
-      success: true,
-      message: `${product.name}  ${
-        (cart.items as CartItem[]).find((x) => x.productId === productId)
-          ? 'updated in'
-          : 'removed from'
-      } cart successfully`,
-    };
-  } catch (error) {
-    return { success: false, message: formatError(error) };
-  }
-};
+```tsx
+const existItem =
+  cart && cart.items.find((x) => x.productId === item.productId);
 ```
+
+Now in the return, let's check for the `existItem` variable and show a remove button with the minus sign, the quantity and an add button with a plus sign:
+
+```tsx
+return existItem ? (
+  <div>
+    <Button type='button' variant='outline' onClick={handleRemoveFromCart}>
+      <Minus className='w-4 h-4' />
+    </Button>
+    <span className='px-2'>{existItem.qty}</span>
+    <Button type='button' variant='outline' onClick={handleAddToCart}>
+      <Plus className='w-4 h-4' />
+    </Button>
+  </div>
+) : (
+  <Button className='w-full' type='button' onClick={handleAddToCart}>
+    <Plus className='w-4 h-4' />
+    Add to cart
+  </Button>
+);
+```
+
+Now add an item to the cart and you should see the add/remove buttons and the quantity.
