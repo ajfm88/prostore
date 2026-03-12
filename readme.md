@@ -1,120 +1,139 @@
-# Dynamic Cart Button
+# `useTransition` Hook
 
-We now have an action to remove the items from the cart. Now we are going to edit the add-item-to-cart button to show a quantity and a remove button.
+We are going to utilize the `useTransition` hook to handle the state of the button.
 
-We need to pass the cart into the button component. So open the product page at `app/(root)/product/[slug]/page.tsx` and let's import our `getMyCart` action:
+## What is useTransition?
+
+useTransition is a React hook that helps manage UI updates by allowing you to mark certain updates as "transitions." Transitions are typically non-urgent updates that can be deferred to improve user experience (e.g., showing a loading spinner while the update happens).
+
+It provides two values:
+
+- **isPending**: A boolean that indicates whether the transition is ongoing.
+- **startTransition**: A function that starts the transition.
+
+
+We are going to show a spinning loader when the transition is pending.
+
+In the `AddToCart` component,  let's import the `useTransition` hook and the `Loader` icon:
 
 ```tsx
-import { getMyCart } from '@/lib/actions/cart.actions';
+import { useTransition } from 'react';
+import { Plus, Minus, Loader } from 'lucide-react';
 ```
 
-then initialize it above the return:
+Then add the following in the function above the `handleAddToCart` function:
 
 ```tsx
-const ProductDetailsPage = async (
-  props: {
-    params: Promise<{ slug: string }>;
-  }
-) => {
-  const params = await props.params;
-
-  const {
-    slug
-  } = params;
-
-  const product = await getProductBySlug(slug)
-  if (!product) notFound();
-
-  const cart = await getMyCart(); //👈 Add this line
-  return (// ...)
+const [isPending, startTransition] = useTransition();
 ```
 
-Now just pass it into the `AddToCart` component:
+- **isPending**: A boolean value that indicates whether the transition is still ongoing. This can be used to show a loading spinner or other feedback to the user.
+- **startTransition**: A function that you wrap around any state updates that you want to handle as a transition. It tells React to delay marking this update as urgent, giving priority to other interactive UI updates.
+
+## `startTransition` Function
+
+We need to wrap the functionality of `handleAddToCart` and `handleRemoveFromCart` functions with the `startTransition` function.
+
+Make your `handleAddToCart` function look like this:
 
 ```tsx
-<AddToCart
-  cart={cart} // 👈 Add this line
-  item={{
-    productId: product.id,
-    name: product.name,
-    slug: product.slug,
-    price: round2(product.price),
-    qty: 1,
-    image: product.images![0],
-  }}
-/>
-```
+// Add item to cart
+const handleAddToCart = async () => {
+  startTransition(async () => {
+    // Execute the addItemToCart action
+    const res = await addItemToCart(item);
 
-Open the `components/shared/product/add-to-cart.tsx` file and add the `cart` prop:
+    // Display appropriate toast message based on the result
+    if (!res.success) {
+      toast({
+        variant: 'destructive',
+        description: res.message,
+      });
+      return;
+    }
 
-```tsx
-const AddToCart = ({
-  cart,
-  item,
-}: {
-  cart?: Cart;
-  item: Omit<CartItem, 'cartId'>;
-}) => {
-  // ...
+    toast({
+      description: `${item.name} added to the cart`,
+      action: (
+        <ToastAction
+          className='bg-primary text-white hover:bg-gray-800'
+          onClick={() => router.push('/cart')}
+          altText='Go to cart'
+        >
+          Go to cart
+        </ToastAction>
+      ),
+    });
+  });
 };
 ```
 
-Import the `Cart` type, `Minus` icon and the `removeFromCart` action:
+We just wrapped the existing functionality with the `startTransition` function.
 
-```tsx
-import { Cart, CartItem } from '@/types';
-import { Plus, Minus } from 'lucide-react';
-import { addItemToCart, removeItemFromCart } from '@/lib/actions/cart.actions';
-```
-
-## Handle Remove From Cart
-
-Add the following function below the `handleAddToCart` function:
+Do the same for the `handleRemoveFromCart` function.
 
 ```tsx
 // Remove item from cart
 const handleRemoveFromCart = async () => {
-  const res = await removeItemFromCart(item.productId);
+  startTransition(async () => {
+    const res = await removeItemFromCart(item.productId);
 
-  toast({
-    variant: res.success ? 'default' : 'destructive',
-    description: res.message,
+    toast({
+      variant: res.success ? 'default' : 'destructive',
+      description: res.message,
+    });
+
+    return;
   });
-
-  return;
 };
 ```
 
-We are just calling the `removeItemFromCart` action and showing a toast message.
-
-## Show Remove From Cart
-
-We are going to create a variable to let us know if the item exists in the cart. Add the following right above the return statement:
-
-```tsx
-const existItem =
-  cart && cart.items.find((x) => x.productId === item.productId);
-```
-
-Now in the return, let's check for the `existItem` variable and show a remove button with the minus sign, the quantity and an add button with a plus sign:
+We are going to set the `disabled` attribute of the buttons to `isPending` and replace the icons with a check for `isPending` and show a loader if `isPending` is `true`.
 
 ```tsx
 return existItem ? (
   <div>
-    <Button type='button' variant='outline' onClick={handleRemoveFromCart}>
-      <Minus className='w-4 h-4' />
+    <Button
+      type='button'
+      variant='outline'
+      disabled={isPending}
+      onClick={handleRemoveFromCart}
+    >
+      {isPending ? (
+        <Loader className='w-4 h-4  animate-spin' />
+      ) : (
+        <Minus className='w-4 h-4' />
+      )}
     </Button>
     <span className='px-2'>{existItem.qty}</span>
-    <Button type='button' variant='outline' onClick={handleAddToCart}>
-      <Plus className='w-4 h-4' />
+    <Button
+      type='button'
+      variant='outline'
+      disabled={isPending}
+      onClick={handleAddToCart}
+    >
+      {isPending ? (
+        <Loader className='w-4 h-4 animate-spin' />
+      ) : (
+        <Plus className='w-4 h-4' />
+      )}
     </Button>
   </div>
 ) : (
-  <Button className='w-full' type='button' onClick={handleAddToCart}>
-    <Plus className='w-4 h-4' />
+  <Button
+    className='w-full'
+    type='button'
+    disabled={isPending}
+    onClick={handleAddToCart}
+  >
+    {isPending ? (
+      <Loader className='w-4 h-4 animate-spin' />
+    ) : (
+      <Plus className='w-4 h-4' />
+    )}
     Add to cart
   </Button>
 );
 ```
 
-Now add an item to the cart and you should see the add/remove buttons and the quantity.
+So now the button will be disabled when the `isPending` state is `true` and will show a loading spinner.
