@@ -1,139 +1,127 @@
-# `useTransition` Hook
+# Cart & Shipping Pages
 
-We are going to utilize the `useTransition` hook to handle the state of the button.
+Now that we can add and remove items from the cart, we'll start the process of checkout. We're going to work on two of the four pages for checkout in this section. That is the cart page with the table as well as the shipping address page, which will allow the user to enter their shipping information.
 
-## What is useTransition?
+We'll start by creating the cart page that will show all the items in the user's cart.
 
-useTransition is a React hook that helps manage UI updates by allowing you to mark certain updates as "transitions." Transitions are typically non-urgent updates that can be deferred to improve user experience (e.g., showing a loading spinner while the update happens).
+Then we'll get started on the table of items. We will use the ShadCN table component for that.
 
-It provides two values:
+We're also going to need to format our currency, so we'll create a utility function to handle that.
 
-- **isPending**: A boolean that indicates whether the transition is ongoing.
-- **startTransition**: A function that starts the transition.
+Then we'll start on the shipping address page, which will be the next step in the checkout process.
 
+We'll add the form to add the user's address.
 
-We are going to show a spinning loader when the transition is pending.
+Then we'll handle the submission with an action. Once the address is filled in, we'll use that address for that user to automatically fill in the fields when they order more products.
 
-In the `AddToCart` component,  let's import the `useTransition` hook and the `Loader` icon:
+Lastly, we'll create a checkout steps component to show where in the proccess the user is.
+
+# Start Cart Page
+
+We are going to start creating cart page, which will ultimately show a table of the items in the cart along with the total. We will start the main page here and then work on the ShadCN table in the next lesson.
+
+Create a new file at `app/(root)/cart/page.tsx` and add the following code:
 
 ```tsx
-import { useTransition } from 'react';
-import { Plus, Minus, Loader } from 'lucide-react';
+export const metadata = {
+  title: "Shopping Cart",
+};
+
+const CartPage = async () => {
+  return <>Cart Page</>;
+};
+
+export default CartPage;
 ```
 
-Then add the following in the function above the `handleAddToCart` function:
+We added some metadata and made the function async. We will use this soon to fetch the cart items.
+
+You should see this page if you navigate to `/cart` in your browser.
+
+Now, let's create the form. Create a new file at `app/(root)/cart/cart-table.tsx` and add the following code:
 
 ```tsx
+"use client";
+
+import { Cart } from "@/types";
+
+const CartTable = ({ cart }: { cart?: Cart }) => {
+  return (
+    <>
+      <h1 className="py-4 h2-bold">Shopping Cart</h1>
+    </>
+  );
+};
+
+export default CartTable;
+```
+
+We are making it a client component because we will be using hookd. We are bringing in the `Cart` type from the `@/types` folder. We are also passing in the `cart` prop to the component, which can be undefined.
+
+Now bring it into the `CartPage` component along with our cart using the `getMyCart` action.
+
+```tsx
+import { getMyCart } from "@/lib/actions/cart.actions";
+import CartTable from "./cart-table";
+
+export const metadata = {
+  title: "Shopping Cart",
+};
+
+const CartPage = async () => {
+  const cart = await getMyCart();
+
+  return (
+    <>
+      <CartTable cart={cart} />
+    </>
+  );
+};
+
+export default CartPage;
+```
+
+You should see the heading "Shopping Cart" on the page.
+
+Let's continue with the cart form. Add the following imports:
+
+```tsx
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
+import { addItemToCart, removeItemFromCart } from "@/lib/actions/cart.actions";
+import { ArrowRight, Loader, Minus, Plus } from "lucide-react";
+import { Cart } from "@/types";
+import Image from "next/image";
+import Link from "next/link";
+```
+
+In the function, let's initialize the `toast` and `router` variables and also our `useTransition` hook.
+
+```tsx
+const router = useRouter();
+const { toast } = useToast();
 const [isPending, startTransition] = useTransition();
 ```
 
-- **isPending**: A boolean value that indicates whether the transition is still ongoing. This can be used to show a loading spinner or other feedback to the user.
-- **startTransition**: A function that you wrap around any state updates that you want to handle as a transition. It tells React to delay marking this update as urgent, giving priority to other interactive UI updates.
-
-## `startTransition` Function
-
-We need to wrap the functionality of `handleAddToCart` and `handleRemoveFromCart` functions with the `startTransition` function.
-
-Make your `handleAddToCart` function look like this:
+For the return, add the following for now:
 
 ```tsx
-// Add item to cart
-const handleAddToCart = async () => {
-  startTransition(async () => {
-    // Execute the addItemToCart action
-    const res = await addItemToCart(item);
-
-    // Display appropriate toast message based on the result
-    if (!res.success) {
-      toast({
-        variant: 'destructive',
-        description: res.message,
-      });
-      return;
-    }
-
-    toast({
-      description: `${item.name} added to the cart`,
-      action: (
-        <ToastAction
-          className='bg-primary text-white hover:bg-gray-800'
-          onClick={() => router.push('/cart')}
-          altText='Go to cart'
-        >
-          Go to cart
-        </ToastAction>
-      ),
-    });
-  });
+  return (
+    <>
+      <h1 className='py-4 h2-bold'>Shopping Cart</h1>
+      {!cart || cart.items.length === 0 ? (
+        <div>
+          Cart is empty. <Link href='/'>Go shopping</Link>
+        </div>
+      ) : (
+        <div className='grid md:grid-cols-4 md:gap-5'>
+          <div className='overflow-x-auto md:col-span-3'></div>
+        </div>
+      )}
+    </>
+  );
 };
 ```
 
-We just wrapped the existing functionality with the `startTransition` function.
-
-Do the same for the `handleRemoveFromCart` function.
-
-```tsx
-// Remove item from cart
-const handleRemoveFromCart = async () => {
-  startTransition(async () => {
-    const res = await removeItemFromCart(item.productId);
-
-    toast({
-      variant: res.success ? 'default' : 'destructive',
-      description: res.message,
-    });
-
-    return;
-  });
-};
-```
-
-We are going to set the `disabled` attribute of the buttons to `isPending` and replace the icons with a check for `isPending` and show a loader if `isPending` is `true`.
-
-```tsx
-return existItem ? (
-  <div>
-    <Button
-      type='button'
-      variant='outline'
-      disabled={isPending}
-      onClick={handleRemoveFromCart}
-    >
-      {isPending ? (
-        <Loader className='w-4 h-4  animate-spin' />
-      ) : (
-        <Minus className='w-4 h-4' />
-      )}
-    </Button>
-    <span className='px-2'>{existItem.qty}</span>
-    <Button
-      type='button'
-      variant='outline'
-      disabled={isPending}
-      onClick={handleAddToCart}
-    >
-      {isPending ? (
-        <Loader className='w-4 h-4 animate-spin' />
-      ) : (
-        <Plus className='w-4 h-4' />
-      )}
-    </Button>
-  </div>
-) : (
-  <Button
-    className='w-full'
-    type='button'
-    disabled={isPending}
-    onClick={handleAddToCart}
-  >
-    {isPending ? (
-      <Loader className='w-4 h-4 animate-spin' />
-    ) : (
-      <Plus className='w-4 h-4' />
-    )}
-    Add to cart
-  </Button>
-);
-```
-
-So now the button will be disabled when the `isPending` state is `true` and will show a loading spinner.
+We are checking if the cart is empty or undefined. If it is, we show a message to go shopping. If it is not, we show the cart. We will be displaying a ShadCN table for the cart items and I want to wrap it in some grid classes.
