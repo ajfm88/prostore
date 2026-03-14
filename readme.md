@@ -1,127 +1,132 @@
-# Cart & Shipping Pages
+# ShadCN Table
 
-Now that we can add and remove items from the cart, we'll start the process of checkout. We're going to work on two of the four pages for checkout in this section. That is the cart page with the table as well as the shipping address page, which will allow the user to enter their shipping information.
+We will use the table component from ShadCN too display the cart items. We need to install it first:
 
-We'll start by creating the cart page that will show all the items in the user's cart.
-
-Then we'll get started on the table of items. We will use the ShadCN table component for that.
-
-We're also going to need to format our currency, so we'll create a utility function to handle that.
-
-Then we'll start on the shipping address page, which will be the next step in the checkout process.
-
-We'll add the form to add the user's address.
-
-Then we'll handle the submission with an action. Once the address is filled in, we'll use that address for that user to automatically fill in the fields when they order more products.
-
-Lastly, we'll create a checkout steps component to show where in the proccess the user is.
-
-# Start Cart Page
-
-We are going to start creating cart page, which will ultimately show a table of the items in the cart along with the total. We will start the main page here and then work on the ShadCN table in the next lesson.
-
-Create a new file at `app/(root)/cart/page.tsx` and add the following code:
-
-```tsx
-export const metadata = {
-  title: "Shopping Cart",
-};
-
-const CartPage = async () => {
-  return <>Cart Page</>;
-};
-
-export default CartPage;
+```bash
+npx shadcn@latest add table
 ```
 
-We added some metadata and made the function async. We will use this soon to fetch the cart items.
-
-You should see this page if you navigate to `/cart` in your browser.
-
-Now, let's create the form. Create a new file at `app/(root)/cart/cart-table.tsx` and add the following code:
+Then we can use it in the `CartTable` component. Let's add the following imports for the card, button and all the table elements:
 
 ```tsx
-"use client";
-
-import { Cart } from "@/types";
-
-const CartTable = ({ cart }: { cart?: Cart }) => {
-  return (
-    <>
-      <h1 className="py-4 h2-bold">Shopping Cart</h1>
-    </>
-  );
-};
-
-export default CartTable;
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 ```
 
-We are making it a client component because we will be using hookd. We are bringing in the `Cart` type from the `@/types` folder. We are also passing in the `cart` prop to the component, which can be undefined.
-
-Now bring it into the `CartPage` component along with our cart using the `getMyCart` action.
+Let's start with the headers. Add the following to the return:
 
 ```tsx
-import { getMyCart } from "@/lib/actions/cart.actions";
-import CartTable from "./cart-table";
-
-export const metadata = {
-  title: "Shopping Cart",
-};
-
-const CartPage = async () => {
-  const cart = await getMyCart();
-
-  return (
-    <>
-      <CartTable cart={cart} />
-    </>
-  );
-};
-
-export default CartPage;
+<div className='grid md:grid-cols-4 md:gap-5'>
+  <div className='overflow-x-auto md:col-span-3'>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Item</TableHead>
+          <TableHead className='text-center'>Quantity</TableHead>
+          <TableHead className='text-right'>Price</TableHead>
+        </TableRow>
+      </TableHeader>
+    </Table>
+  </div>
+</div>
 ```
 
-You should see the heading "Shopping Cart" on the page.
+## Image & Name Cell
 
-Let's continue with the cart form. Add the following imports:
+Now let's add the table body and map over the cart items. We will add the first table cell, which will be the item image and name:
 
 ```tsx
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
-import { addItemToCart, removeItemFromCart } from "@/lib/actions/cart.actions";
-import { ArrowRight, Loader, Minus, Plus } from "lucide-react";
-import { Cart } from "@/types";
-import Image from "next/image";
-import Link from "next/link";
+<TableBody>
+  {cart.items.map((item) => (
+    <TableRow key={item.slug}>
+      <TableCell>
+        <Link href={`/product/${item.slug}`} className='flex items-center'>
+          <Image
+            src={item.image}
+            alt={item.name}
+            width={50}
+            height={50}
+          ></Image>
+          <span className='px-2'>{item.name}</span>
+        </Link>
+      </TableCell>
+    </TableRow>
+  ))}
+</TableBody>
 ```
 
-In the function, let's initialize the `toast` and `router` variables and also our `useTransition` hook.
+Be sure you have the sample images in the `public/images/sample-products` folder.
+
+## Quantity & Add/Remove Cell
+
+The next cell will be the quantity and the add/remove buttons. We will add the following to the table body:
 
 ```tsx
-const router = useRouter();
-const { toast } = useToast();
-const [isPending, startTransition] = useTransition();
+<TableCell className='flex-center gap-2'>
+  <Button
+    disabled={isPending}
+    variant='outline'
+    type='button'
+    onClick={() =>
+      startTransition(async () => {
+        const res = await removeItemFromCart(item.productId);
+        if (!res.success) {
+          toast({
+            variant: 'destructive',
+            description: res.message,
+          });
+        }
+      })
+    }
+  >
+    {isPending ? (
+      <Loader className='w-4 h-4  animate-spin' />
+    ) : (
+      <Minus className='w-4 h-4' />
+    )}
+  </Button>
+  <span>{item.qty}</span>
+  <Button
+    disabled={isPending}
+    variant='outline'
+    type='button'
+    onClick={() =>
+      startTransition(async () => {
+        const res = await addItemToCart(item);
+        if (!res.success) {
+          toast({
+            variant: 'destructive',
+            description: res.message,
+          });
+        }
+      })
+    }
+  >
+    {isPending ? (
+      <Loader className='w-4 h-4  animate-spin' />
+    ) : (
+      <Plus className='w-4 h-4' />
+    )}
+  </Button>
+</TableCell>
 ```
 
-For the return, add the following for now:
+We are doing the same thing that we did with the add to cart component. We are showing the loader when the request is pending and the button when it is not. We have the plus and minus buttons to add and remove items from the cart.
+
+## Price Cell
+
+Lastly, we will add the price cell. We will add the following to the table body:
 
 ```tsx
-  return (
-    <>
-      <h1 className='py-4 h2-bold'>Shopping Cart</h1>
-      {!cart || cart.items.length === 0 ? (
-        <div>
-          Cart is empty. <Link href='/'>Go shopping</Link>
-        </div>
-      ) : (
-        <div className='grid md:grid-cols-4 md:gap-5'>
-          <div className='overflow-x-auto md:col-span-3'></div>
-        </div>
-      )}
-    </>
-  );
-};
+<TableCell className='text-right'>${item.price}</TableCell>
 ```
 
-We are checking if the cart is empty or undefined. If it is, we show a message to go shopping. If it is not, we show the cart. We will be displaying a ShadCN table for the cart items and I want to wrap it in some grid classes.
+In the next lesson, we will have a card that shows the total. We are also going to create a custom function to format the currency.
