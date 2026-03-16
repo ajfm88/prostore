@@ -27,18 +27,13 @@ export function formatError(error: any): string {
     });
 
     return fieldErrors.join(". ");
-  } else if (
-    error.name === "PrismaClientKnownRequestError" &&
-    error.code === "P2002"
-  ) {
+  } else if (error.name === "PrismaClientKnownRequestError" && error.code === "P2002") {
     // Handle Prisma error
     const field = error.meta?.target ? error.meta.target[0] : "Field";
     return `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`;
   } else {
     // Handle other errors
-    return typeof error.message === "string"
-      ? error.message
-      : JSON.stringify(error.message);
+    return typeof error.message === "string" ? error.message : JSON.stringify(error.message);
   }
 }
 
@@ -52,3 +47,20 @@ export const round2 = (value: number | string) => {
     throw new Error("value is not a number nor a string");
   }
 };
+
+const CURRENCY_FORMATTER = new Intl.NumberFormat("en-US", {
+  currency: "USD",
+  style: "currency",
+  minimumFractionDigits: 2,
+});
+
+// Format currency
+export function formatCurrency(amount: number | string | null) {
+  if (typeof amount === "number") {
+    return CURRENCY_FORMATTER.format(amount);
+  } else if (typeof amount === "string") {
+    return CURRENCY_FORMATTER.format(Number(amount));
+  } else {
+    return "NaN";
+  }
+}

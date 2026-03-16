@@ -1,132 +1,82 @@
-# ShadCN Table
+# Subtotal Card & Format Currency
 
-We will use the table component from ShadCN too display the cart items. We need to install it first:
+We are going to add the subtotal to our cart page and create a utility function to format the currency.
 
-```bash
-npx shadcn@latest add table
+Open the file `lib/utils.ts` and add the following code below the other functions:
+
+```ts
+const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
+  currency: 'USD',
+  style: 'currency',
+  minimumFractionDigits: 2,
+});
 ```
 
-Then we can use it in the `CartTable` component. Let's add the following imports for the card, button and all the table elements:
+This is a currency formatter. `Intl.NumberFormat` is a built-in JavaScript object that provides language-sensitive number formatting and makes it easy to format numbers as currency, percentages, or general numbers based on locale. We are using the `en-US` locale and formatting the currency as USD. We are also setting the minimum number of fractional digits to 2.
+
+Now let's create the function below it:
+
+```ts
+// Format currency
+export function formatCurrency(amount: number | string | null) {
+  if (typeof amount === 'number') {
+    return CURRENCY_FORMATTER.format(amount);
+  } else if (typeof amount === 'string') {
+    return CURRENCY_FORMATTER.format(Number(amount));
+  } else {
+    return 'NaN';
+  }
+}
+```
+
+This function takes in a number or string and returns a formatted currency string. If the input is a number, it formats it using the `CURRENCY_FORMATTER`. If the input is a string, it converts it to a number and then formats it. If the input is not a number or string, it returns 'NaN', which is not a number.
+
+Now, let's go back into the `CartTable` component and bring in the `formatCurrency` function:
 
 ```tsx
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { formatCurrency } from '@/lib/utils';
 ```
 
-Let's start with the headers. Add the following to the return:
+Now, let's go right above the last closing `</div>` and add the following:
 
 ```tsx
-<div className='grid md:grid-cols-4 md:gap-5'>
-  <div className='overflow-x-auto md:col-span-3'>
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Item</TableHead>
-          <TableHead className='text-center'>Quantity</TableHead>
-          <TableHead className='text-right'>Price</TableHead>
-        </TableRow>
-      </TableHeader>
-    </Table>
-  </div>
-</div>
+<Card>
+  <CardContent className='p-4 gap-4'>
+    <div className='pb-3 text-xl'>
+      Subtotal ({cart.items.reduce((a, c) => a + c.qty, 0)}):
+      <span className='font-bold'> {formatCurrency(cart.itemsPrice)}</span>
+    </div>
+  </CardContent>
+</Card>
 ```
 
-## Image & Name Cell
+We are using the `Card` component to display the subtotal. We get the subtotal by summing the quantity of each item in the cart by using the `reduce` method. We are also formatting the currency using the `formatCurrency` function.
 
-Now let's add the table body and map over the cart items. We will add the first table cell, which will be the item image and name:
+## Proceed To Checkout Button
+
+Now let's add the button to proceed to checkout. Make the `Card` component look like this:
 
 ```tsx
-<TableBody>
-  {cart.items.map((item) => (
-    <TableRow key={item.slug}>
-      <TableCell>
-        <Link href={`/product/${item.slug}`} className='flex items-center'>
-          <Image
-            src={item.image}
-            alt={item.name}
-            width={50}
-            height={50}
-          ></Image>
-          <span className='px-2'>{item.name}</span>
-        </Link>
-      </TableCell>
-    </TableRow>
-  ))}
-</TableBody>
+<Card>
+  <CardContent className='p-4   gap-4'>
+    <div className='pb-3 text-xl'>
+      Subtotal ({cart.items.reduce((a, c) => a + c.qty, 0)}):
+      {formatCurrency(cart.itemsPrice)}
+    </div>
+    <Button
+      onClick={() => startTransition(() => router.push('/shipping-address'))}
+      className='w-full'
+      disabled={isPending}
+    >
+      {isPending ? (
+        <Loader className='animate-spin w-4 h-4' />
+      ) : (
+        <ArrowRight className='w-4 h-4' />
+      )}
+      Proceed to Checkout
+    </Button>
+  </CardContent>
+</Card>
 ```
 
-Be sure you have the sample images in the `public/images/sample-products` folder.
-
-## Quantity & Add/Remove Cell
-
-The next cell will be the quantity and the add/remove buttons. We will add the following to the table body:
-
-```tsx
-<TableCell className='flex-center gap-2'>
-  <Button
-    disabled={isPending}
-    variant='outline'
-    type='button'
-    onClick={() =>
-      startTransition(async () => {
-        const res = await removeItemFromCart(item.productId);
-        if (!res.success) {
-          toast({
-            variant: 'destructive',
-            description: res.message,
-          });
-        }
-      })
-    }
-  >
-    {isPending ? (
-      <Loader className='w-4 h-4  animate-spin' />
-    ) : (
-      <Minus className='w-4 h-4' />
-    )}
-  </Button>
-  <span>{item.qty}</span>
-  <Button
-    disabled={isPending}
-    variant='outline'
-    type='button'
-    onClick={() =>
-      startTransition(async () => {
-        const res = await addItemToCart(item);
-        if (!res.success) {
-          toast({
-            variant: 'destructive',
-            description: res.message,
-          });
-        }
-      })
-    }
-  >
-    {isPending ? (
-      <Loader className='w-4 h-4  animate-spin' />
-    ) : (
-      <Plus className='w-4 h-4' />
-    )}
-  </Button>
-</TableCell>
-```
-
-We are doing the same thing that we did with the add to cart component. We are showing the loader when the request is pending and the button when it is not. We have the plus and minus buttons to add and remove items from the cart.
-
-## Price Cell
-
-Lastly, we will add the price cell. We will add the following to the table body:
-
-```tsx
-<TableCell className='text-right'>${item.price}</TableCell>
-```
-
-In the next lesson, we will have a card that shows the total. We are also going to create a custom function to format the currency.
+The button is disabled when the request is pending and the loader is shown when it is not. When the button is clicked, it will navigate to the `/shipping-address` page.
