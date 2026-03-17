@@ -8,10 +8,7 @@ import { prisma } from "@/db/prisma";
 import { formatError } from "../utils";
 
 // Sign in the user with credentials
-export async function signInWithCredentials(
-  prevState: unknown,
-  formData: FormData,
-) {
+export async function signInWithCredentials(prevState: unknown, formData: FormData) {
   try {
     // Set user from form and validate it with Zod schema
     const user = signInFormSchema.parse({
@@ -73,4 +70,14 @@ export async function signUp(prevState: unknown, formData: FormData) {
       message: formatError(error),
     };
   }
+}
+
+// Get user by ID
+export async function getUserById(userId: string) {
+  const user = await prisma.user.findFirst({
+    where: { id: userId },
+  });
+
+  if (!user) throw new Error("User not found");
+  return user;
 }

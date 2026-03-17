@@ -1,82 +1,113 @@
-# Subtotal Card & Format Currency
+# Shipping Address Zod Schema & Page
 
-We are going to add the subtotal to our cart page and create a utility function to format the currency.
+Let's create our next step in the checkout process, the shipping address page and form.
 
-Open the file `lib/utils.ts` and add the following code below the other functions:
+## Shipping Address Schema
 
-```ts
-const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
-  currency: 'USD',
-  style: 'currency',
-  minimumFractionDigits: 2,
+Let's start by creating the Zod schema for the shipping address. Open the `lib/validator.ts` file and add the following:
+
+```tsx
+export const shippingAddressSchema = z.object({
+  fullName: z.string().min(3, 'Name must be at least 3 characters'),
+  streetAddress: z.string().min(3, 'Address must be at least 3 characters'),
+  city: z.string().min(3, 'city must be at least 3 characters'),
+  postalCode: z.string().min(3, 'Postal code must be at least 3 characters'),
+  country: z.string().min(3, 'Country must be at least 3 characters'),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
 });
 ```
 
-This is a currency formatter. `Intl.NumberFormat` is a built-in JavaScript object that provides language-sensitive number formatting and makes it easy to format numbers as currency, percentages, or general numbers based on locale. We are using the `en-US` locale and formatting the currency as USD. We are also setting the minimum number of fractional digits to 2.
+## Shipping Address Type
 
-Now let's create the function below it:
+Let's add the following type to the `types/index.ts` file:
 
-```ts
-// Format currency
-export function formatCurrency(amount: number | string | null) {
-  if (typeof amount === 'number') {
-    return CURRENCY_FORMATTER.format(amount);
-  } else if (typeof amount === 'string') {
-    return CURRENCY_FORMATTER.format(Number(amount));
-  } else {
-    return 'NaN';
+```tsx
+import {
+  cartItemSchema,
+  insertCartSchema,
+  insertProductSchema,
+  shippingAddressSchema,
+} from '@/lib/validator';
+```
+
+```tsx
+export type ShippingAddress = z.infer<typeof shippingAddressSchema>;
+```
+
+## Default Values / Constants
+
+Let's add some constants to the `lib/constants/index.ts` file:
+
+```tsx
+export const shippingAddressDefaultValues = {
+  fullName: 'John Doe',
+  streetAddress: '123 Main St',
+  city: 'Anytown',
+  postalCode: '12345',
+  country: 'USA',
+};
+```
+
+Of course you can add different values if you would like.
+
+## Shipping Address Page
+
+Let's create the page. Create a new file at `app/(root)/shipping-address/page.tsx` and add the following:
+
+```tsx
+import { auth } from '@/auth';
+import { getMyCart } from '@/lib/actions/cart.actions';
+import { getUserById } from '@/lib/actions/user.actions';
+import { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { ShippingAddress } from '@/types';
+
+export const metadata: Metadata = {
+  title: 'Shipping Address',
+};
+
+const ShippingAddressPage = async () => {
+  const cart = await getMyCart();
+
+  if (!cart || cart.items.length === 0) redirect('/cart');
+
+  const session = await auth();
+
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    throw new Error('User ID not found');
   }
+
+  const user = await getUserById(userId);
+
+  return <>Shipping Page</>;
+};
+
+export default ShippingAddressPage;
+```
+
+We are bringing in the `auth` function from the `auth` file. This will give us the current user's session. We are using the `getMyCart` function from the `cart.actions` file to get the current user's cart. We are using the `getUserById` function from the `user.actions` file to get the current user's information. We have not created this yet, but we will in a minute.
+
+We are using the `redirect` function from `next/navigation` to redirect the user to the cart page if the cart is empty. We are using the `Metadata` type from `next` to set the page title. We are using the `ShippingAddress` type from the `types` file to type the `user` variable.
+
+## Get User By ID
+
+Open the `lib/actions/user.actions.ts` file and add the following:
+
+```tsx
+// Get user by ID
+export async function getUserById(userId: string) {
+  const user = await prisma.user.findFirst({
+    where: { id: userId },
+  });
+
+  if (!user) throw new Error('User not found');
+  return user;
 }
 ```
 
-This function takes in a number or string and returns a formatted currency string. If the input is a number, it formats it using the `CURRENCY_FORMATTER`. If the input is a string, it converts it to a number and then formats it. If the input is not a number or string, it returns 'NaN', which is not a number.
+This is a simple function that gets the user by their ID. We are using the `prisma.user.findFirst` method to get the user by their ID. We are using the `where` property to specify the ID of the user we want to get. We are using the `if` statement to check if the user exists. If the user does not exist, we are throwing an error. We are returning the user.
 
-Now, let's go back into the `CartTable` component and bring in the `formatCurrency` function:
-
-```tsx
-import { formatCurrency } from '@/lib/utils';
-```
-
-Now, let's go right above the last closing `</div>` and add the following:
-
-```tsx
-<Card>
-  <CardContent className='p-4 gap-4'>
-    <div className='pb-3 text-xl'>
-      Subtotal ({cart.items.reduce((a, c) => a + c.qty, 0)}):
-      <span className='font-bold'> {formatCurrency(cart.itemsPrice)}</span>
-    </div>
-  </CardContent>
-</Card>
-```
-
-We are using the `Card` component to display the subtotal. We get the subtotal by summing the quantity of each item in the cart by using the `reduce` method. We are also formatting the currency using the `formatCurrency` function.
-
-## Proceed To Checkout Button
-
-Now let's add the button to proceed to checkout. Make the `Card` component look like this:
-
-```tsx
-<Card>
-  <CardContent className='p-4   gap-4'>
-    <div className='pb-3 text-xl'>
-      Subtotal ({cart.items.reduce((a, c) => a + c.qty, 0)}):
-      {formatCurrency(cart.itemsPrice)}
-    </div>
-    <Button
-      onClick={() => startTransition(() => router.push('/shipping-address'))}
-      className='w-full'
-      disabled={isPending}
-    >
-      {isPending ? (
-        <Loader className='animate-spin w-4 h-4' />
-      ) : (
-        <ArrowRight className='w-4 h-4' />
-      )}
-      Proceed to Checkout
-    </Button>
-  </CardContent>
-</Card>
-```
-
-The button is disabled when the request is pending and the loader is shown when it is not. When the button is clicked, it will navigate to the `/shipping-address` page.
+In the next lesson, we will create the shipping address form component.
