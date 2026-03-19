@@ -72,6 +72,12 @@ export async function signUp(prevState: unknown, formData: FormData) {
   }
 }
 
+// Update user address
+export async function updateUserAddress(data: unknown) {
+  // TODO: implement in next lesson
+  return { success: false, message: "Not implemented" };
+}
+
 // Get user by ID
 export async function getUserById(userId: string) {
   const user = await prisma.user.findFirst({

@@ -1,113 +1,254 @@
-# Shipping Address Zod Schema & Page
+# Shipping Address Form
 
-Let's create our next step in the checkout process, the shipping address page and form.
+We have our shipping page, now we need to create the form.
 
-## Shipping Address Schema
+There are two packages that we need to install:
 
-Let's start by creating the Zod schema for the shipping address. Open the `lib/validator.ts` file and add the following:
+- `react-hook-form`: This is a library that helps us manage forms in React. It integrates well with ShadCN form components. It takes care of things like managing form state, handling form submissions, validating form inputs and displaying error messages. So we don't have to write all that ourselves.
+- `@hookform/resolvers`: The @hookform/resolvers package provides integrations between react-hook-form and validation libraries like zod. It enables react-hook-form to leverage the validation schemas from these libraries directly, making it simpler to apply custom validation rules. This way we don't have to write custom validation functions.
+
+Run the following in your terminal:
+
+```bash
+npm install react-hook-form @hookform/resolvers
+```
+
+We also need to install the ShadCN form component:
+
+```bash
+npx shadcn@latest add form
+```
+
+Create a new file at `app/(root)/shipping-address/shipping-address-form.tsx` and add the following for now:
 
 ```tsx
-export const shippingAddressSchema = z.object({
-  fullName: z.string().min(3, 'Name must be at least 3 characters'),
-  streetAddress: z.string().min(3, 'Address must be at least 3 characters'),
-  city: z.string().min(3, 'city must be at least 3 characters'),
-  postalCode: z.string().min(3, 'Postal code must be at least 3 characters'),
-  country: z.string().min(3, 'Country must be at least 3 characters'),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
+'use client';
+
+import { SubmitHandler, useForm } from 'react-hook-form';
+import { ShippingAddress } from '@/types';
+import { useRouter } from 'next/navigation';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { shippingAddressSchema } from '@/lib/validator';
+import { ControllerRenderProps } from 'react-hook-form';
+import { shippingAddressDefaultValues } from '@/lib/constants';
+import { useToast } from '@/hooks/use-toast';
+import { useTransition } from 'react';
+import { updateUserAddress } from '@/lib/actions/user.actions';
+import CheckoutSteps from '@/components/shared/checkout-steps';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { ArrowRight, Loader } from 'lucide-react';
+
+const ShippingAddressForm = ({
+  address,
+}: {
+  address: ShippingAddress | null;
+}) => {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  return <>Shipping Form</>;
+};
+
+export default ShippingAddressForm;
+```
+
+We are starting out simple and just adding the imports, passing in the address prop, initializing the router and toast, and returning the text, Shipping Form.
+
+Now bring it into the shipping page:
+
+```tsx
+import ShippingAddressForm from './shipping-address-form';
+```
+
+Embed it in the page and pass in the user address:
+
+```tsx
+return (
+    <>
+      <ShippingAddressForm address={user.address as ShippingAddress} />
+    </>
+```
+
+Now let's continue in the `app/(root)/shipping-address/shipping-address-form.tsx` file.
+
+With Reach Hook Form, we have access to a `useForm` hook. This hook returns an object with a bunch of properties. We then pass this object to the `Form` component.
+
+Add this above the return in the component:
+
+```tsx
+const form = useForm<z.infer<typeof shippingAddressSchema>>({
+  resolver: zodResolver(shippingAddressSchema),
+  defaultValues: address || shippingAddressDefaultValues,
 });
 ```
 
-## Shipping Address Type
+We are using the `zodResolver` to validate the form data. We are also setting the default values to the address if it exists, or the default values from the `lib/constants/index.ts` file.
 
-Let's add the following type to the `types/index.ts` file:
+When you call `useForm()` in a component with react-hook-form, it provides an object (`form` in this case) that contains various methods and properties essential for handling form functionality, like `handleSubmit`, `control`, `reset`, etc. By spreading `...form` onto` <Form>`, we will effectively be passing each of these properties as individual props to the `<Form>` component.
 
-```tsx
-import {
-  cartItemSchema,
-  insertCartSchema,
-  insertProductSchema,
-  shippingAddressSchema,
-} from '@/lib/validator';
-```
+Since we are using `useTransition`, add the following next:
 
 ```tsx
-export type ShippingAddress = z.infer<typeof shippingAddressSchema>;
+const [isPending, startTransition] = useTransition();
 ```
 
-## Default Values / Constants
+Now let's add the form.
 
-Let's add some constants to the `lib/constants/index.ts` file:
+Replace the `return` statement with the following:
 
 ```tsx
-export const shippingAddressDefaultValues = {
-  fullName: 'John Doe',
-  streetAddress: '123 Main St',
-  city: 'Anytown',
-  postalCode: '12345',
-  country: 'USA',
-};
+return (
+  <>
+    <div className='max-w-md mx-auto space-y-4'>
+      <h1 className='h2-bold mt-4'>Shipping Address</h1>
+      <p className='text-sm text-muted-foreground'>
+        Please enter the address that you want to ship to
+      </p>
+      <Form {...form}>
+        <form
+          method='post'
+          onSubmit={form.handleSubmit(onSubmit)}
+          className='space-y-4'
+        >
+          <div className='flex flex-col gap-5 md:flex-row'>
+            <FormField
+              control={form.control}
+              name='fullName'
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<
+                  z.infer<typeof shippingAddressSchema>,
+                  'fullName'
+                >;
+              }) => (
+                <FormItem className='w-full'>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder='Enter full name' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div>
+            <FormField
+              control={form.control}
+              name='streetAddress'
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<
+                  z.infer<typeof shippingAddressSchema>,
+                  'streetAddress'
+                >;
+              }) => (
+                <FormItem className='w-full'>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Input placeholder='Enter address' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className='flex flex-col gap-5 md:flex-row'>
+            <FormField
+              control={form.control}
+              name='city'
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<
+                  z.infer<typeof shippingAddressSchema>,
+                  'city'
+                >;
+              }) => (
+                <FormItem className='w-full'>
+                  <FormLabel>City</FormLabel>
+                  <FormControl>
+                    <Input placeholder='Enter city' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='country'
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<
+                  z.infer<typeof shippingAddressSchema>,
+                  'country'
+                >;
+              }) => (
+                <FormItem className='w-full'>
+                  <FormLabel>Country</FormLabel>
+                  <FormControl>
+                    <Input placeholder='Enter country' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='postalCode'
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<
+                  z.infer<typeof shippingAddressSchema>,
+                  'postalCode'
+                >;
+              }) => (
+                <FormItem className='w-full'>
+                  <FormLabel>Postal Code</FormLabel>
+                  <FormControl>
+                    <Input placeholder='Enter postal code' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className='flex gap-2'>
+            <Button type='submit' disabled={isPending}>
+              {isPending ? (
+                <Loader className='animate-spin w-4 h-4' />
+              ) : (
+                <ArrowRight className='w-4 h-4' />
+              )}
+              Continue
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
+  </>
+);
 ```
 
-Of course you can add different values if you would like.
+We are building our form with the `Form` component from the `@/components/ui/form`. We are also using the `FormField` component to render the fields. The `control='form-control'` is used to bind the form control and state to the form. The `name` prop is used to bind the field to the form. The `render` prop is used to render the field. We are using `ControllerRenderProps` to get the field value and the `field` prop is used to bind the field to the form.
 
-## Shipping Address Page
+We are using the `Input` component from the `@/components/ui/input` to render the inputs. We are also using the `FormMessage` component to render any error messages that have to do with the field.
 
-Let's create the page. Create a new file at `app/(root)/shipping-address/page.tsx` and add the following:
+The `render` prop defines the field rendering, allowing react-hook-form to bind the input value to field with `{...field}` in each `<Input />` component.
 
-```tsx
-import { auth } from '@/auth';
-import { getMyCart } from '@/lib/actions/cart.actions';
-import { getUserById } from '@/lib/actions/user.actions';
-import { Metadata } from 'next';
-import { redirect } from 'next/navigation';
-import { ShippingAddress } from '@/types';
+So a lot is being done behind the scenes here. It may seem a bit weird if you are used to handling forms manually. React Hook Form is a popular library and you will run into it a lot.
 
-export const metadata: Metadata = {
-  title: 'Shipping Address',
-};
-
-const ShippingAddressPage = async () => {
-  const cart = await getMyCart();
-
-  if (!cart || cart.items.length === 0) redirect('/cart');
-
-  const session = await auth();
-
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    throw new Error('User ID not found');
-  }
-
-  const user = await getUserById(userId);
-
-  return <>Shipping Page</>;
-};
-
-export default ShippingAddressPage;
-```
-
-We are bringing in the `auth` function from the `auth` file. This will give us the current user's session. We are using the `getMyCart` function from the `cart.actions` file to get the current user's cart. We are using the `getUserById` function from the `user.actions` file to get the current user's information. We have not created this yet, but we will in a minute.
-
-We are using the `redirect` function from `next/navigation` to redirect the user to the cart page if the cart is empty. We are using the `Metadata` type from `next` to set the page title. We are using the `ShippingAddress` type from the `types` file to type the `user` variable.
-
-## Get User By ID
-
-Open the `lib/actions/user.actions.ts` file and add the following:
-
-```tsx
-// Get user by ID
-export async function getUserById(userId: string) {
-  const user = await prisma.user.findFirst({
-    where: { id: userId },
-  });
-
-  if (!user) throw new Error('User not found');
-  return user;
-}
-```
-
-This is a simple function that gets the user by their ID. We are using the `prisma.user.findFirst` method to get the user by their ID. We are using the `where` property to specify the ID of the user we want to get. We are using the `if` statement to check if the user exists. If the user does not exist, we are throwing an error. We are returning the user.
-
-In the next lesson, we will create the shipping address form component.
+In the next lesson we will create the submit handler and the action to update a user's address.
