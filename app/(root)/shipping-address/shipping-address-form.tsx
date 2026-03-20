@@ -1,12 +1,11 @@
 "use client";
 
-import { SubmitHandler, useForm } from "react-hook-form";
+import { SubmitHandler, useForm, ControllerRenderProps } from "react-hook-form";
 import { ShippingAddress } from "@/types";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { shippingAddressSchema } from "@/lib/validator";
-import { ControllerRenderProps } from "react-hook-form";
 import { shippingAddressDefaultValues } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { useTransition } from "react";
@@ -35,8 +34,20 @@ const ShippingAddressForm = ({ address }: { address: ShippingAddress | null }) =
 
   const [isPending, startTransition] = useTransition();
 
-  const onSubmit = () => {
-    return;
+  const onSubmit: SubmitHandler<z.infer<typeof shippingAddressSchema>> = async (values) => {
+    startTransition(async () => {
+      const res = await updateUserAddress(values);
+
+      if (!res.success) {
+        toast({
+          variant: "destructive",
+          description: res.message,
+        });
+        return;
+      }
+
+      router.push("/payment-method");
+    });
   };
 
   return (
