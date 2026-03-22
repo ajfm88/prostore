@@ -27,10 +27,7 @@ export const config = {
         });
         // Check if user exists and password is correct
         if (user && user.password) {
-          const isMatch = compareSync(
-            credentials.password as string,
-            user.password,
-          );
+          const isMatch = compareSync(credentials.password as string, user.password);
           // If password is correct, return user object
           if (isMatch) {
             return {
@@ -63,25 +60,34 @@ export const config = {
       return session;
     },
     async jwt({ token, user, trigger, session }: any) {
-      // Assign user fields to token
       if (user) {
+        // Assign user properties to the token
+        token.id = user.id;
         token.role = user.role;
 
-        // If user has no name, use email as their default name
-        if (user.name === "NO_NAME") {
-          token.name = user.email!.split("@")[0];
+        if (trigger === "signIn" || trigger === "signUp") {
+          const cookiesObject = await cookies();
+          const sessionCartId = cookiesObject.get("sessionCartId")?.value;
 
-          // Update the user in the database with the new name
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { name: token.name },
-          });
+          if (sessionCartId) {
+            const sessionCart = await prisma.cart.findFirst({
+              where: { sessionCartId },
+            });
+
+            if (sessionCart) {
+              // Overwrite any existing user cart
+              await prisma.cart.deleteMany({
+                where: { userId: user.id },
+              });
+
+              // Assign the guest cart to the logged-in user
+              await prisma.cart.update({
+                where: { id: sessionCart.id },
+                data: { userId: user.id },
+              });
+            }
+          }
         }
-      }
-
-      // Handle session updates (e.g., name change)
-      if (session?.user.name && trigger === "update") {
-        token.name = session.user.name;
       }
 
       return token;

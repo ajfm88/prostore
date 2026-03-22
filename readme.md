@@ -1,65 +1,50 @@
-# Checkout Steps Component
+# Persist Cart On Sign In
 
-We are gong to create a component for the checkout steps. This will keep track of where we are in the process.
+So we have the first couple pages of our checkout and we have our cart. However, right now, if you add items to your cart as a guest and then log in, your cart will not persist. To fix this, we will ensure that the guest cart (session-based) is set as the user cart when the user signs in.
 
-Create a new file at `components/shared/checkout-steps.tsx` and add the following:
+We will do this by overwriting the user cart on sign in. When a user logs in, we check for their guest sessionCartId. If the guest cart exists, we update the user's cart with the session cart items.
 
-```tsx
-import React from 'react';
 
-import { cn } from '@/lib/utils';
+Open the `auth.ts` file and add the following:
 
-const CheckoutSteps = ({ current = 0 }) => {
-  return (
-    <div className='flex-between  flex-col md:flex-row  space-x-2 space-y-2 mb-10'>
-      {['User Login', 'Shipping Address', 'Payment Method', 'Place Order'].map(
-        (step, index) => (
-          <React.Fragment key={step}>
-            <div
-              className={cn(
-                'p-2 w-56 rounded-full text-center  text-sm',
-                index === current ? 'bg-secondary' : ''
-              )}
-            >
-              {step}
-            </div>
-            {step !== 'Place Order' && (
-              <hr className='w-16 border-t border-gray-300 mx-2' />
-            )}
-          </React.Fragment>
-        )
-      )}
-    </div>
-  );
-};
-export default CheckoutSteps;
-```
+```ts
+async jwt({ token, user, trigger, session }: any) {
+  if (user) {
+    // Assign user properties to the token
+    token.id = user.id;
+    token.role = user.role;
 
-The steps are as follows:
+    if (trigger === 'signIn' || trigger === 'signUp') {
+      const cookiesObject = await cookies();
+      const sessionCartId = cookiesObject.get('sessionCartId')?.value;
 
-- User Login
-- Shipping Address
-- Payment Method
-- Place Order
+      if (sessionCartId) {
+        const sessionCart = await prisma.cart.findFirst({
+          where: { sessionCartId },
+        });
 
-This component takes in a `current` prop which is the current step. It will display the steps and highlight the current step. We are using the `cn` function from the `lib/utils.ts` file to conditionally add the `bg-secondary` class to the step.
+        if (sessionCart) {
+          // Overwrite any existing user cart
+          await prisma.cart.deleteMany({
+            where: { userId: user.id },
+          });
 
-We are mapping over the steps and rendering them. We are using a React Fragment to wrap each step and the horizontal line. A fragment is just a way to group elements without adding extra nodes to the DOM. You could just as well use a div, but it's a bit cleaner.
+          // Assign the guest cart to the logged-in user
+          await prisma.cart.update({
+            where: { id: sessionCart.id },
+            data: { userId: user.id },
+          });
+        }
+      }
+    }
+  }
 
-## Display In Shipping Form
+  return token;
+},
+ ```
 
-Now let's bring the steps into the shipping form. Open the `app/(root)/shipping-address/shipping-address-form.tsx` file and add the following import:
+ We are checking for a sign in or sign up trigger and then getting the `sessionCartId` from the cookie.
 
-```tsx
-import CheckoutSteps from '@/components/shared/checkout-steps';
-```
+ We then find the user cart if there is one and overwrite it with the guests.
 
-In the return statement, add the following just under the opening fragment (<>):
-
-```tsx
-<CheckoutSteps current={1} />
-```
-
-You should see the steps with the shipping page step highlighted.
-
-Let's continue on to the payment method page.
+ You could merge the two but the code starts to get very complicated and I dont feel I have a good ability to explain that for this course. 
