@@ -1,50 +1,32 @@
-# Persist Cart On Sign In
+# Protecting Paths
 
-So we have the first couple pages of our checkout and we have our cart. However, right now, if you add items to your cart as a guest and then log in, your cart will not persist. To fix this, we will ensure that the guest cart (session-based) is set as the user cart when the user signs in.
+Right now, we can go to any path whether we are logged in or not. For instance, if we go to `/shipping-address` and we are not logged in, it let's us. We see an error but it still let's us go to the page, which we don't want. We want it to redirect to the sign in page.
 
-We will do this by overwriting the user cart on sign in. When a user logs in, we check for their guest sessionCartId. If the guest cart exists, we update the user's cart with the session cart items.
+Since we have the following line in our `middleware.ts` file, we can add this functionality to the `authorized` callback in the `auth.ts` file.
 
-
-Open the `auth.ts` file and add the following:
+Open the `auth.ts` file and add the following at the top of the `authorized` callback:
 
 ```ts
-async jwt({ token, user, trigger, session }: any) {
-  if (user) {
-    // Assign user properties to the token
-    token.id = user.id;
-    token.role = user.role;
+authorized({ request, auth }: any) {
+  // Array of regex patterns of protected paths
+  const protectedPaths = [
+    /\/shipping-address/,
+    /\/payment-method/,
+    /\/place-order/,
+    /\/profile/,
+    /\/user\/(.*)/,
+    /\/order\/(.*)/,
+    /\/admin/,
+  ];
 
-    if (trigger === 'signIn' || trigger === 'signUp') {
-      const cookiesObject = await cookies();
-      const sessionCartId = cookiesObject.get('sessionCartId')?.value;
+  // Get pathname from the req URL object
+  const { pathname } = request.nextUrl;
 
-      if (sessionCartId) {
-        const sessionCart = await prisma.cart.findFirst({
-          where: { sessionCartId },
-        });
+  // Check if user is not authenticated and on a protected path
+  if (!auth && protectedPaths.some((p) => p.test(pathname))) return false;
 
-        if (sessionCart) {
-          // Overwrite any existing user cart
-          await prisma.cart.deleteMany({
-            where: { userId: user.id },
-          });
-
-          // Assign the guest cart to the logged-in user
-          await prisma.cart.update({
-            where: { id: sessionCart.id },
-            data: { userId: user.id },
-          });
-        }
-      }
-    }
-  }
-
-  return token;
+  // ... Rest of the file
 },
- ```
+```
 
- We are checking for a sign in or sign up trigger and then getting the `sessionCartId` from the cookie.
-
- We then find the user cart if there is one and overwrite it with the guests.
-
- You could merge the two but the code starts to get very complicated and I dont feel I have a good ability to explain that for this course. 
+We just set an array of regex patterns with the paths we want to protect, got the pathname and added a conditional to check if the user is logged in and trying to access a protected path. If so, we return false and that will redirect the user to the sign in page.

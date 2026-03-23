@@ -4,6 +4,7 @@ import { prisma } from "@/db/prisma";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compareSync } from "bcrypt-ts-edge";
 import { authConfig } from "@/auth.config";
+import { cookies } from "next/headers";
 
 export const config = {
   ...authConfig,
