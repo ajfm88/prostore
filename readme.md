@@ -1,112 +1,115 @@
-# Payment Method & Orders Page
+# Payment Method Page & Form
 
-In this section, we'll be adding more pages to the checkout process. We're going to have a payment method selection page where the use can select Paypal, Stripe or Cash on Delivery. We will also have a place order page so the user can review the order items and then place the order. After they place the order, they'll be taken to an order details page with the payment buttons.
+Just like with shipping, payment method will have a page and then a form embedded into it.
 
-We're going to create the payment select form and the action that that form will submit to. It will update the user's payment method in the database.
+Create a new file at `app/(root)/payment-method/page.tsx` and add the following code:
 
-After the payment method page is done, we'll create an order schema as well as an `orderItems` schema for each item. Because when a user places an order, the items will be stored in the `orderItems` table while the basic order info like the totalPrice will be in the `order` table.
+```tsx
+import { Metadata } from 'next';
+import { auth } from '@/auth';
+import { getUserById } from '@/lib/actions/user.actions';
 
-We'll need to create a createOrder action to add that stuff to the database.
+export const metadata: Metadata = {
+  title: 'Payment Method',
+};
 
-We're going to have a place order page with a summary of the items and a button to place the order.
+const PaymentMethodPage = async () => {
+  const session = await auth();
+  const userId = session?.user?.id;
 
-Once they place the order, they will be taken to the order page and will have the option to pay with their seleced method. Of course, we have not added the PayPal or Stripe integration, but later on they will have either PayPal buttons or a Stripe form.
-
-We're also going to be creating some utility functions along the way to shorten the id for display as well as the date and time.
-
-# Payment Method Action & Schema
-
-Now that we have the shipping page, we will start to add the payment method page. This page will allow the user to select a payment method and enter their payment details.
-
-Before we create the actual page, we will need to create the schema for the payment method page as well as the action.
-
-## Payment Methods
-
-The payment methods that we will accept will be PayPal, Stripe and Cash on Delivery.
-
-Open your `.env` file and add the following line:
-
-```bash
-PAYMENT_METHODS="PayPal, Stripe, CashOnDelivery"
-DEFAULT_PAYMENT_METHOD="PayPal"
-```
-
-Then open the `lib/constants/index.ts` file and add the following code:
-
-```typescript
-export const PAYMENT_METHODS = process.env.PAYMENT_METHODS
-  ? process.env.PAYMENT_METHODS.split(", ")
-  : ["PayPal", "Stripe", "CashOnDelivery"];
-export const DEFAULT_PAYMENT_METHOD = process.env.DEFAULT_PAYMENT_METHOD || "PayPal";
-```
-
-We are just exporting the `PAYMENT_METHODS` and `DEFAULT_PAYMENT_METHOD` constants from the `lib/constants/index.ts` file. We are using `split()` to convert the comma-separated string into an array. If the `PAYMENT_METHODS` environment variable is not set, we will use the default values.
-
-## Payment Method Schema
-
-We need to create our Zod schema for the payment method. Opent the `lib/validators.ts` file and import the constant:
-
-```typescript
-import { PAYMENT_METHODS } from "./constants";
-```
-
-Then add the following schema:
-
-```typescript
-//Payment Schema
-export const paymentMethodSchema = z
-  .object({
-    type: z.string().min(1, "Pyament method is required"),
-  })
-  .refine((data) => PAYMENT_METHODS.includes(data.type), {
-    path: ["type"],
-    message: "Invalid payment method",
-  });
-```
-
-We are making sure that the payment method is one of the payment methods that we support.
-
-## `updateUserPaymentMethod` Action
-
-Open the `lib/actions/user.actions.ts` file and import the new schema and Zod:
-
-```typescript
-import {
-  signInFormSchema,
-  signUpFormSchema,
-  shippingAddressSchema,
-  paymentMethodSchema,
-} from "../validator";
-import { z } from "zod";
-```
-
-Now add the following function:
-
-```typescript
-// Update user's payment method
-export async function updateUserPaymentMethod(data: z.infer<typeof paymentMethodSchema>) {
-  try {
-    const session = await auth();
-    const currentUser = await prisma.user.findFirst({
-      where: { id: session?.user.id! },
-    });
-    if (!currentUser) throw new Error("User not found");
-
-    const paymentMethod = paymentMethodSchema.parse(data);
-
-    await prisma.user.update({
-      where: { id: currentUser.id },
-      data: { paymentMethod: paymentMethod.type },
-    });
-
-    return {
-      success: true,
-      message: "User updated successfully",
-    };
-  } catch (error) {
-    return { success: false, message: formatError(error) };
+  if (!userId) {
+    throw new Error('User ID not found');
   }
-}
+
+  const user = await getUserById(userId);
+
+  return <>Payment Method Form</>;
+};
+
+export default PaymentMethodPage;
 ```
 
-We are just updating the user's payment method by finding the user by their id and updating the `paymentMethod` field. We are also validating the data using the `paymentMethodSchema` schema.
+Now when you continue from the shipping page, you should see the text "Payment Method Form" on the screen.
+
+## Payment Method Form
+
+We need to create the payment method form. We will create the file and add some some imports and initialization but we'll add the actual form components in the next lesson.
+
+
+Now create a file at `app/(root)/payment-method/payment-method-form.tsx` and add the following code:
+
+```tsx
+'use client';
+
+import CheckoutSteps from '@/components/shared/checkout-steps';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useToast } from '@/hooks/use-toast';
+import { updateUserPaymentMethod } from '@/lib/actions/user.actions';
+import { DEFAULT_PAYMENT_METHOD, PAYMENT_METHODS } from '@/lib/constants';
+import { paymentMethodSchema } from '@/lib/validator';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { ArrowRight, Loader } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useTransition } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+
+const PaymentMethodForm = ({
+  preferredPaymentMethod,
+}: {
+  preferredPaymentMethod: string | null;
+}) => {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof paymentMethodSchema>>({
+    resolver: zodResolver(paymentMethodSchema),
+    defaultValues: {
+      type: preferredPaymentMethod || DEFAULT_PAYMENT_METHOD,
+    },
+  });
+
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <>
+      <CheckoutSteps current={2} />
+    </>
+  );
+};
+
+export default PaymentMethodForm;
+```
+
+We just have all the imports that we will need along with the `PaymentMethodForm` component which takes in a `preferredPaymentMethod` prop. This prop will be used to set the default value of the radio group. We are initializing the router and the toast hook. We are also initializing the form with the `paymentMethodSchema` and the default value of the radio group. We are also initializing the `isPending` state and the `startTransition` function.
+
+Then we return the `CheckoutSteps` component.
+
+Now let's bring it into the `PaymentMethodPage` component. Update the `PaymentMethodPage` component in `app/(root)/payment-method/page.tsx` to the following:
+
+```tsx
+import PaymentMethodForm from './payment-method-form';
+```
+
+In the return:
+
+```tsx
+return (
+  <>
+    <PaymentMethodForm preferredPaymentMethod={user.paymentMethod} />
+  </>
+);
+```
+
+You should now see the checkout steps if you click continue from the shipping page or go to /payment-method directly.
+
+In the next lesson, we will add all the form components and handle the form submission.
