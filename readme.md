@@ -1,115 +1,110 @@
-# Payment Method Page & Form
+# Payment Method Form & Submission
 
-Just like with shipping, payment method will have a page and then a form embedded into it.
+We have our `PaymentMethodPage` and `PaymentMethodForm` components. However, we have yet to display the form and handle the form submission. That's what we'll do now.
 
-Create a new file at `app/(root)/payment-method/page.tsx` and add the following code:
+In this form, we will use ShadCN radio buttons. So we need to install them. Open a terminal and run the following command:
 
-```tsx
-import { Metadata } from 'next';
-import { auth } from '@/auth';
-import { getUserById } from '@/lib/actions/user.actions';
-
-export const metadata: Metadata = {
-  title: 'Payment Method',
-};
-
-const PaymentMethodPage = async () => {
-  const session = await auth();
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    throw new Error('User ID not found');
-  }
-
-  const user = await getUserById(userId);
-
-  return <>Payment Method Form</>;
-};
-
-export default PaymentMethodPage;
+```bash
+npx shadcn@latest add radio-group
 ```
 
-Now when you continue from the shipping page, you should see the text "Payment Method Form" on the screen.
-
-## Payment Method Form
-
-We need to create the payment method form. We will create the file and add some some imports and initialization but we'll add the actual form components in the next lesson.
-
-
-Now create a file at `app/(root)/payment-method/payment-method-form.tsx` and add the following code:
-
-```tsx
-'use client';
-
-import CheckoutSteps from '@/components/shared/checkout-steps';
-import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useToast } from '@/hooks/use-toast';
-import { updateUserPaymentMethod } from '@/lib/actions/user.actions';
-import { DEFAULT_PAYMENT_METHOD, PAYMENT_METHODS } from '@/lib/constants';
-import { paymentMethodSchema } from '@/lib/validator';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowRight, Loader } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useTransition } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-
-const PaymentMethodForm = ({
-  preferredPaymentMethod,
-}: {
-  preferredPaymentMethod: string | null;
-}) => {
-  const router = useRouter();
-  const { toast } = useToast();
-
-  const form = useForm<z.infer<typeof paymentMethodSchema>>({
-    resolver: zodResolver(paymentMethodSchema),
-    defaultValues: {
-      type: preferredPaymentMethod || DEFAULT_PAYMENT_METHOD,
-    },
-  });
-
-  const [isPending, startTransition] = useTransition();
-
-  return (
-    <>
-      <CheckoutSteps current={2} />
-    </>
-  );
-};
-
-export default PaymentMethodForm;
-```
-
-We just have all the imports that we will need along with the `PaymentMethodForm` component which takes in a `preferredPaymentMethod` prop. This prop will be used to set the default value of the radio group. We are initializing the router and the toast hook. We are also initializing the form with the `paymentMethodSchema` and the default value of the radio group. We are also initializing the `isPending` state and the `startTransition` function.
-
-Then we return the `CheckoutSteps` component.
-
-Now let's bring it into the `PaymentMethodPage` component. Update the `PaymentMethodPage` component in `app/(root)/payment-method/page.tsx` to the following:
-
-```tsx
-import PaymentMethodForm from './payment-method-form';
-```
-
-In the return:
+Open the `app/(root)/payment-method/payment-method-form.tsx` file and add the following code to the return:
 
 ```tsx
 return (
   <>
-    <PaymentMethodForm preferredPaymentMethod={user.paymentMethod} />
+    <CheckoutSteps current={2} />
+    <div className='max-w-md mx-auto'>
+      <Form {...form}>
+        <form
+          method='post'
+          onSubmit={form.handleSubmit(onSubmit)}
+          className='space-y-4'
+        >
+          <h1 className='h2-bold mt-4'>Payment Method</h1>
+          <p className='text-sm text-muted-foreground'>
+            Please select your preferred payment method
+          </p>
+          <div className='flex flex-col gap-5 md:flex-row'>
+            <FormField
+              control={form.control}
+              name='type'
+              render={({ field }) => (
+                <FormItem className='space-y-3'>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      className='flex flex-col space-y-2'
+                    >
+                      {PAYMENT_METHODS.map((paymentMethod) => (
+                        <FormItem
+                          key={paymentMethod}
+                          className='flex items-center space-x-3 space-y-0'
+                        >
+                          <FormControl>
+                            <RadioGroupItem
+                              value={paymentMethod}
+                              checked={field.value === paymentMethod}
+                            />
+                          </FormControl>
+                          <FormLabel className='font-normal'>
+                            {paymentMethod}
+                          </FormLabel>
+                        </FormItem>
+                      ))}
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className='flex gap-2'>
+            <Button type='submit' disabled={isPending}>
+              {isPending ? (
+                <Loader className='animate-spin w-4 h-4' />
+              ) : (
+                <ArrowRight className='w-4 h-4' />
+              )}
+              Continue
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
   </>
 );
 ```
 
-You should now see the checkout steps if you click continue from the shipping page or go to /payment-method directly.
+We are displaying the payment methods as radio buttons. We are also displaying the submit button. We are also disabling the submit button when the form is pending. We are also displaying the loader when the form is pending.
 
-In the next lesson, we will add all the form components and handle the form submission.
+## Submit Handler
+
+Let's add the following function above the return statement:
+
+```tsx
+async function onSubmit(values: z.infer<typeof paymentMethodSchema>) {
+  startTransition(async () => {
+    const res = await updateUserPaymentMethod(values);
+
+    if (!res.success) {
+      toast({
+        variant: 'destructive',
+        description: res.message,
+      });
+
+      return;
+    }
+
+    router.push('/place-order');
+  });
+}
+```
+
+We are using the `startTransition` function to wrap the async function. We are also using the `updateUserPaymentMethod` function to update the user's payment method. We are also checking if the response is successful. If it is not, we are displaying the error message. If it is, we are redirecting the user to the `place-order` page.
+
+Now you should see the payment method form on the payment method page.
+
+## Test Flow
+
+So the way that we have it setup is you can add items to the cart as a guest and when you checkout you will be asked to log in. When you log in, you will be taken back to where you left off. Go ahead and try it by logging out and adding an item to the cart. Then go to the checkout page and log in. You should be taken back to the checkout process.
