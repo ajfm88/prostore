@@ -1,111 +1,70 @@
-# Order & OrderItem Models
+# Order Zod Schemas & Type
 
-Our checkout process is looking good. Now we need to create the page where the user can place the order. Before we do that though, we need to setup our database to handle orders. This means creating a new model and table for orders and order items.
+## Insert Order Zod Schema
 
-## Create Order Schema
+Now let's add the Zod schema for insert order. Open the `lib/validators.ts` file and add the following code:
 
-We need a new schema and table for orders. Open the `schema.prisma` file and add the following:
-
-```prisma
-model Order {
-  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId          String      @db.Uuid
-  shippingAddress Json        @db.Json
-  paymentMethod   String
-  paymentResult   Json?       @db.Json
-  itemsPrice      Decimal     @db.Decimal(12, 2)
-  shippingPrice   Decimal     @db.Decimal(12, 2)
-  taxPrice        Decimal     @db.Decimal(12, 2)
-  totalPrice      Decimal     @db.Decimal(12, 2)
-  isPaid          Boolean     @default(false)
-  paidAt          DateTime?   @db.Timestamp(6)
-  isDelivered     Boolean     @default(false)
-  deliveredAt     DateTime?   @db.Timestamp(6)
-  createdAt       DateTime    @default(now()) @db.Timestamp(6)
-  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "order_userId_user_id_fk")
-  orderItems      OrderItem[]
-}
+```typescript
+// Insert Order Schema
+export const insertOrderSchema = z.object({
+  userId: z.string().min(1, 'User is required'),
+  itemsPrice: currency,
+  shippingPrice: currency,
+  taxPrice: currency,
+  totalPrice: currency,
+  paymentMethod: z.string().refine((data) => PAYMENT_METHODS.includes(data), {
+    message: 'Invalid payment method',
+  }),
+  shippingAddress: shippingAddressSchema,
+});
 ```
 
-Here is a rundown of the fields:
+This is for the order that is being created.
 
-- `id`: A unique identifier for the order.
-- `userId`: The ID of the user who placed the order.
-- `shippingAddress`: The shipping address for the order.
-- `paymentMethod`: The payment method used for the order.
-- `paymentResult`: The result of the payment.
-- `itemsPrice`: The price of the items in the order.
-- `shippingPrice`: The price of the
-- `taxPrice`: The price of the tax for the order.
-- `totalPrice`: The total price of the order.
-- `isPaid`: Whether the order has been paid for.
-- `paidAt`: The date and time the order was paid for.
-- `isDelivered`: Whether the order has been delivered.
-- `deliveredAt`: The date and time the order was delivered.
-- `createdAt`: The date and time the order was created.
-- `user`: The user who placed the order. This is a one-to-many relationship. We create a foreign key constraint on the `userId` field and name it `order_userId_user_id_fk`.
-- `orderItems`: This is an array of order items. We will create the `OrderItem` model next.
+We also need a schema for the order items. Open the `lib/validators.ts` file and add the following code:
 
-Since we added a relationship with the user model, we need to add the following to the user model:
-
-```prisma
-model User {
-  //...
-  Order         Order[]
-}
+```typescript
+export const insertOrderItemSchema = z.object({
+  productId: z.string(),
+  slug: z.string(),
+  image: z.string(),
+  name: z.string(),
+  price: currency,
+  qty: z.number(),
+});
 ```
 
-Add the following to the `schema.prisma` file:
+## Order & OrderItem Types
 
-```prisma
-model OrderItem {
-  orderId   String  @db.Uuid
-  productId String  @db.Uuid
-  qty       Int
-  price     Decimal @db.Decimal(12, 2)
-  name      String
-  slug      String
-  image     String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "orderItems_orderId_order_id_fk")
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "orderItems_productId_product_id_fk")
-  @@id([orderId, productId], map: "orderItems_orderId_productId_pk")
-}
+Now let's add the types for the order and order item. Open the `types/index.ts` file and import the `insertOrderSchema` and `insertOrderItemSchema` from the `lib/validators.ts` file:
+
+```typescript
+import {
+  cartItemSchema,
+  insertCartSchema,
+  insertProductSchema,
+  shippingAddressSchema,
+  insertOrderItemSchema,
+  insertOrderSchema,
+} from '@/lib/validator';
 ```
 
-Since we added a relationship with the product model, we need to add the following to the product model:
+Now add the following code:
 
-```prisma
-model Product {
-  //...
-  OrderItem       OrderItem[]
-}
+```typescript
+export type OrderItem = z.infer<typeof insertOrderItemSchema>;
+export type Order = z.infer<typeof insertOrderSchema> & {
+  id: string;
+  createdAt: Date;
+  isPaid: Boolean;
+  paidAt: Date | null;
+  isDelivered: Boolean;
+  deliveredAt: Date | null;
+  orderItems: OrderItem[];
+  user: { name: string; email: string };
+};
 ```
 
-Here is a rundown of the fields:
+We are using the `z.infer` type to get the type of the schema. We are also adding some additional fields to the order type.
 
-- `orderId`: The ID of the order the item belongs to.
-- `productId`: The ID of the product the item belongs to.
-- `qty`: The quantity of the item.
-- `price`: The price of the item.
-- `name`: The name of the item.
-- `slug`: The slug of the item.
-- `image`: The image of the item.
-- `order`: The order the item belongs to. This is a one-to-many relationship. We create a foreign key constraint on the `orderId` field and name it `orderItems_orderId_order_id_fk`.
-- `product`: The product the item belongs to. This is a one-to-many relationship. We create a foreign key constraint on the `productId` field and name it `orderItems_productId_product_id_fk`.
-- `@@id([orderId, productId], map: "orderItems_orderId_productId_pk")`: This is a composite primary key. We create a composite primary key on the `orderId` and `productId` fields. We name it `orderItems_orderId_productId_pk`.
-
-## Migrate & Generate
-
-Now that our models/schemas are setup, we need to migrate and generate the database.
-
-Stop the server if it is running. Also stop Prisma Studio if it is running.
-
-Run the following commands:
-
-```bash
-npx prisma migrate dev --name add-order
-npx prisma generate
-```
-
-Now run the server and Studio. If you open up Studio you should see the new `Order` and `OrderItem` tables.
-
+Next we will start to create an action to create an order.
