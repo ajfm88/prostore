@@ -5,7 +5,7 @@ import { ShippingAddress } from "@/types";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { shippingAddressSchema } from "@/lib/validator";
+import { shippingAddressSchema } from "@/lib/validators";
 import { shippingAddressDefaultValues } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { useTransition } from "react";

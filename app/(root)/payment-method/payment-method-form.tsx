@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { updateUserPaymentMethod } from "@/lib/actions/user.actions";
 import { DEFAULT_PAYMENT_METHOD, PAYMENT_METHODS } from "@/lib/constants";
-import { paymentMethodSchema } from "@/lib/validator";
+import { paymentMethodSchema } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Loader } from "lucide-react";
 import { useRouter } from "next/navigation";
