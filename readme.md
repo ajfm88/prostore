@@ -1,139 +1,63 @@
-# Place Order Form
+# Order Details Page
 
-Now let's create the form to embed, which is essentially just a button.
+Now that we can place an order, we need to work on a page to show the order details.
 
-Create a new file at `app/(root)/place-order/place-order-form.tsx` and add the following code:
+Let's start with the action to fetch an order by ID. Open the `lib/actions/order.actions.ts` file and import the `convertToPlainObject` function:
+
+```ts
+import { convertToPlainObject } from '../utils';
+```
+
+Create a new function:
+
+```ts
+export async function getOrderById(orderId: string) {
+  const data = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+    },
+    include: {
+      orderItems: true,
+      user: { select: { name: true, email: true } },
+    },
+  });
+  return convertToPlainObject(data);
+}
+```
+
+This is very simple. We are just getting the order by the ID and returning the order with the user and the order items.
+
+## Order Details Page
+
+Create a page at `app/(root)/order/[id]/page.tsx` and add the following code:
 
 ```tsx
-'use client';
-import { Check, Loader } from 'lucide-react';
-import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { createOrder } from '@/lib/actions/order.actions';
-import { useRouter } from 'next/navigation';
+import { getOrderById } from '@/lib/actions/order.actions';
+import { notFound } from 'next/navigation';
+import { ShippingAddress } from '@/types';
 
-const PlaceOrderForm = () => {
-  const router = useRouter();
-
-  return <>Place order form</>;
+export const metadata = {
+  title: 'Order Details',
 };
 
-export default PlaceOrderForm;
-```
+const OrderDetailsPage = async (props: {
+  params: Promise<{
+    id: string;
+  }>;
+}) => {
+  const params = await props.params;
 
-Bring it into the `app/(root)/place-order/page.tsx` file:
+  const { id } = params;
 
-```tsx
-import PlaceOrderForm from './place-order-form';
-```
+  const order = await getOrderById(id);
+  if (!order) notFound();
 
-Replace the comment with the following:
-
-```tsx
-<PlaceOrderForm />
-```
-
-You should see the text for now.
-
-## Form State and Submission
-
-Let's add the form and the place order button. Add the following to the return:
-
-```tsx
- return (
-    <form onSubmit={handleSubmit} className='w-full'>
-      <PlaceOrderButton />
-    </form>
-  );
-```
-
-## `PlaceOrderButton`
-
-We are going to create a `PlaceOrderButton` component that will be used to submit the form.
-
-Add the following right above the return statement:
-
-```tsx
-const PlaceOrderButton = () => {
-    const { pending } = useFormStatus();
-    return (
-      <Button disabled={pending} className='w-full'>
-        {pending ? (
-          <Loader className='w-4 h-4 animate-spin' />
-        ) : (
-          <Check className='w-4 h-4' />
-        )}{' '}
-        Place Order
-      </Button>
-    );
-  };
-```
-
-This component will be used to submit the form. It will be disabled if the form is pending and will show a loading spinner if it is.
-
-## `handleSubmit` Function
-
-Now add the `handleSubmit`:
-
-```tsx
- const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    const res = await createOrder();
-
-    if (res.redirectTo) {
-      router.push(res.redirectTo);
-    }
-  };
-```
-
-We are simple calling the action and redirecting to the `redirectTo` in the response.
-
-
-If you click the place order button, an order should get added to the database.
-
-Here is the full code:
-
-```tsx
-'use client';
-import { Check, Loader } from 'lucide-react';
-import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { createOrder } from '@/lib/actions/order.actions';
-import { useRouter } from 'next/navigation';
-
-const PlaceOrderForm = () => {
-  const router = useRouter();
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault(); 
-    const res = await createOrder();
-    if (res.redirectTo) {
-      router.push(res.redirectTo);
-    }
-  };
-
-  const PlaceOrderButton = () => {
-    const { pending } = useFormStatus();
-    return (
-      <Button disabled={pending} className='w-full'>
-        {pending ? (
-          <Loader className='w-4 h-4 animate-spin' />
-        ) : (
-          <Check className='w-4 h-4' />
-        )}{' '}
-        Place Order
-      </Button>
-    );
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className='w-full'>
-      <PlaceOrderButton />
-    </form>
-  );
+  return <>Order Details Form</>;
 };
 
-export default PlaceOrderForm;
-
+export default OrderDetailsPage;
 ```
+
+Now when you place an order, you should see the text "Order Details Form".
+
+We will work on the form, but first we have some utility functions to create. We will do that next.
