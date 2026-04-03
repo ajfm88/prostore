@@ -1,89 +1,216 @@
-# Format Utility Functions
+# Order Details Table
 
-We are going to create the order details form soon, however ther are some utility functoina that we need to create first.
+So, now we are going to create the table to embed in the order details page.
 
-Open the `lib/utils.js` file. There are two functions that we need to create:
+Create a file at `app/(root)/order/[id]/order-details-table.tsx` and add the following code:
 
-- `formatId` - This will shorten the ID to 6 characters
-- `formatDate` - Format the date in 3 different ways (Date & Time, Date Only, Time Only)
+```tsx
+'use client';
 
-Here is the first one:
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
+import { formatCurrency, formatDateTime, formatId } from '@/lib/utils';
+import { Order } from '@/types';
+import Image from 'next/image';
+import Link from 'next/link';
 
-```js
-// Shorten ID
-export function formatId(id: string) {
-  return `..${id.substring(id.length - 6)}`;
-}
-```
+const OrderDetailsTable = ({ order }: { order: Order }) => {
+  const { toast } = useToast();
 
-Here is an example of it's usage:
-
-```js
-const id1 = '439dde63-541a-4cc9-891a-ffeae193abc0';
-const id2 = '1234567890abcdef';
-
-console.log(formatId(id1)); // Expected: "..abc0"
-console.log(formatId(id2)); // Expected: "..cdef"
-```
-
-Now let's create the `formatDateTime` function:
-
-```js
-export const formatDateTime = (dateString: Date) => {
-  const dateTimeOptions: Intl.DateTimeFormatOptions = {
-    month: 'short', // abbreviated month name (e.g., 'Oct')
-    year: 'numeric', // abbreviated month name (e.g., 'Oct')
-    day: 'numeric', // numeric day of the month (e.g., '25')
-    hour: 'numeric', // numeric hour (e.g., '8')
-    minute: 'numeric', // numeric minute (e.g., '30')
-    hour12: true, // use 12-hour clock (true) or 24-hour clock (false)
-  };
-  const dateOptions: Intl.DateTimeFormatOptions = {
-    weekday: 'short', // abbreviated weekday name (e.g., 'Mon')
-    month: 'short', // abbreviated month name (e.g., 'Oct')
-    year: 'numeric', // numeric year (e.g., '2023')
-    day: 'numeric', // numeric day of the month (e.g., '25')
-  };
-  const timeOptions: Intl.DateTimeFormatOptions = {
-    hour: 'numeric', // numeric hour (e.g., '8')
-    minute: 'numeric', // numeric minute (e.g., '30')
-    hour12: true, // use 12-hour clock (true) or 24-hour clock (false)
-  };
-  const formattedDateTime: string = new Date(dateString).toLocaleString(
-    'en-US',
-    dateTimeOptions
+  return (
+    <>
+      <h1 className='py-4 text-2xl'> Order {formatId(order.id)}</h1>
+      <div className='grid md:grid-cols-3 md:gap-5'>
+        <div className='overflow-x-auto md:col-span-2 space-y-4'>Content</div>
+      </div>
+    </>
   );
-  const formattedDate: string = new Date(dateString).toLocaleString(
-    'en-US',
-    dateOptions
-  );
-  const formattedTime: string = new Date(dateString).toLocaleString(
-    'en-US',
-    timeOptions
-  );
-  return {
-    dateTime: formattedDateTime,
-    dateOnly: formattedDate,
-    timeOnly: formattedTime,
-  };
 };
+
+export default OrderDetailsTable;
 ```
 
-## Testing
+We are just bringing in some components from ShadCN, Image, Link components, our utility functions.
 
-We can get the date and time in different formats. Here is an example:
+The component takes in an order object as a prop. We initialize the toast. We are then displaying the short version of the order id.
 
-```js
-// Import or copy the function here if necessary
-const testDate = new Date('2023-10-25T08:30:00Z'); // Example date string
+Bring the form into the order details page.
 
-// Call the formatDateTime function
-const formatted = formatDateTime(testDate);
+Open the `app/(root)/order/[id]/page.tsx` file and add the following import:
 
-// Log the results
-console.log('Full DateTime:', formatted.dateTime); // Expected output: "Oct 25, 2023, 1:30 AM" (adjusted for timezone)
-console.log('Date Only:', formatted.dateOnly); // Expected output: "Wed, Oct 25, 2023"
-console.log('Time Only:', formatted.timeOnly); // Expected output: "1:30 AM" (adjusted for timezone)
+```tsx
+import OrderDetailsTable from './order-details-table';
 ```
 
-Now we can use these around the app.
+Then, add the following code to the `OrderPage` component:
+
+```tsx
+return (
+  <OrderDetailsTable
+    order={{
+      ...order,
+      shippingAddress: order.shippingAddress as ShippingAddress,
+    }}
+  />
+);
+```
+
+We are just passing in the order object to the form. We are also casting the shippingAddress to the ShippingAddress type.
+
+After placing an order, you should see the order ID. Let's continue on with the order form component.
+
+Open the `app/(root)/order/[id]/order-details-table.tsx` file.
+
+Let's destructure the order data. Right above the toast variable, add the following code:
+
+```tsx
+const {
+  shippingAddress,
+  orderItems,
+  itemsPrice,
+  taxPrice,
+  shippingPrice,
+  totalPrice,
+  paymentMethod,
+  isPaid,
+  paidAt,
+  isDelivered,
+  deliveredAt,
+} = order;
+```
+
+We are just destructuring the order data.
+
+## Payment Method Card
+
+In the return, within the `div` tags, add the following card:
+
+```tsx
+<Card>
+  <CardContent className='p-4 gap-4'>
+    <h2 className='text-xl pb-4'>Payment Method</h2>
+    <p>{paymentMethod}</p>
+    {isPaid ? (
+      <Badge variant='secondary'>
+        Paid at {formatDateTime(paidAt!).dateTime}
+      </Badge>
+    ) : (
+      <Badge variant='destructive'>Not paid</Badge>
+    )}
+  </CardContent>
+</Card>
+```
+
+We are checking if the order is paid. If it is, we are displaying the paid at date. If it is not, we are displaying a badge that says "Not paid".
+
+## Shipping Address Card
+
+Now add the following card under the last one:
+
+```tsx
+<Card>
+  <CardContent className='p-4 gap-4'>
+    <h2 className='text-xl pb-4'>Shipping Address</h2>
+    <p>{shippingAddress.fullName}</p>
+    <p>
+      {shippingAddress.streetAddress}, {shippingAddress.city},{' '}
+      {shippingAddress.postalCode}, {shippingAddress.country}{' '}
+    </p>
+    {isDelivered ? (
+      <Badge variant='secondary'>
+        Delivered at {formatDateTime(deliveredAt!).dateTime}
+      </Badge>
+    ) : (
+      <Badge variant='destructive'>Not delivered</Badge>
+    )}
+  </CardContent>
+</Card>
+```
+
+This checks for delivery and will display a badge that says "Not delivered" if it is not delivered and the delivery date if it is delivered.
+
+## Order Items Table
+
+Add the following card under the last one:
+
+```tsx
+<Card>
+  <CardContent className='p-4 gap-4'>
+    <h2 className='text-xl pb-4'>Order Items</h2>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Item</TableHead>
+          <TableHead>Quantity</TableHead>
+          <TableHead>Price</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {orderItems.map((item) => (
+          <TableRow key={item.slug}>
+            <TableCell>
+              <Link
+                href={`/product/${item.slug}`}
+                className='flex items-center'
+              >
+                <Image
+                  src={item.image}
+                  alt={item.name}
+                  width={50}
+                  height={50}
+                ></Image>
+                <span className='px-2'>{item.name}</span>
+              </Link>
+            </TableCell>
+            <TableCell>
+              <span className='px-2'>{item.qty}</span>
+            </TableCell>
+            <TableCell className='text-right'>${item.price}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </CardContent>
+</Card>
+```
+
+This will show the order items.
+
+Finally we want the price summary. Add this `div` in the middle of the 2 closing `div` tags:
+
+```tsx
+<div>
+  <Card>
+    <CardContent className='p-4 space-y-4 gap-4'>
+      <h2 className='text-xl pb-4'>Order Summary</h2>
+      <div className='flex justify-between'>
+        <div>Items</div>
+        <div>{formatCurrency(itemsPrice)}</div>
+      </div>
+      <div className='flex justify-between'>
+        <div>Tax</div>
+        <div>{formatCurrency(taxPrice)}</div>
+      </div>
+      <div className='flex justify-between'>
+        <div>Shipping</div>
+        <div>{formatCurrency(shippingPrice)}</div>
+      </div>
+      <div className='flex justify-between'>
+        <div>Total</div>
+        <div>{formatCurrency(totalPrice)}</div>
+      </div>
+    </CardContent>
+  </Card>
+</div>
+```
+
+So now our process is almost complete. We just have to implement the actual purchase functionality. We will do that next.
