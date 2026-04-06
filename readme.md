@@ -1,37 +1,103 @@
-# PayPal Developer Setup
+# Generate PayPal Access Token
 
-Now we are going to start to implement PayPal. In order to do that, you need to go to https://developer.paypal.com/ and log in.
+Now that we have our PayPal keys, we can start to implement PayPal payments. There are a few steps we need to take with the PayPal API. We need to:
 
-PayPal has a sandbox mode where you can test your application before you go live. The way it works is you create a sandbox account for the "buyer" and a sandbox account for the "seller". You can then use these accounts to test your application. Everything works as if it were in live mode, but you are not actually using real money.
+- Generate an access token: This is a token that serves as a secure identifier, allowing your app to interact with PayPal's services on behalf of a user or merchant. It grants your application the necessary permissions to perform specific actions, such as creating orders, processing payments, or issuing refunds.
+- Create an order: Create an order and set the intent to "capture"
+- Capture payment: To successfully capture payment for an order, the buyer must first approve the order or a valid payment_source must be provided in the request. So typically, once we pay, the status gets set to approve.
 
-## Create Sandbox Accounts
+That's what we're going to do in a nutshell. We will also write some unit tests with Jest to test these functions out.
 
-Once you log into developer.paypal.com, go to "Testing Tools" and then "Sandbox Accounts".
+We are going to start by generating an access token.
 
-You may have a default business and a default personal account. If you do, you don't need to create new ones.
+## Create The PayPal File
 
-If you don't have any test accounts, click "Create Account" and select "Business". This will be the account that the store will use to receive money.
+Let's create a new file at `lib/paypal.ts`. This will contain the PayPal API calls.
 
-Now click "Create Account" again and select "Personal". This will be the account that the store will use to pay for things.
+Let's start by creating a variable to hold the paypal api url.:
 
-## Create App
-
-Under "Apps & Credentials", click on "Create App". Give it a name and keep Merchant selected.
-
-Select a test business account to use and click "Create App".
-
-You will be taken to a page with your keys.
-
-Copy the Client ID and the Secret and put them in your .env file along with the api url:
-
-```
-PAYPAL_API_URL=https://api-m.sandbox.paypal.com
-PAYPAL_CLIENT_ID="AeFIi3onfA_dW_ncys8G4dsdsdJg2IT_kRV1PJIlHFgcecrlmMApC6zpb5Nsd7zlxj7UWJ5FRZtx"
-PAYPAL_APP_SECRET="EEdG53DEeX_ShoPasdsd1nORwyG3xXmzSxFCDcSofBBTq9VRqjs6xsNVBcbjqz--HiiGoiV"
+```ts
+const base = process.env.PAYPAL_API_URL || 'https://api-m.sandbox.paypal.com';
 ```
 
-Don't use these keys, they are not real.
+We will use this in all of our requests to the PayPal API.
 
-Once you want to go live, you would change the url to https://api-m.paypal.com and change the client id and secret to the live ones.
+## `paypal` Object
 
-In the next lesson, we will start to implement PayPal.
+We are going to have an object with a method to create and order and to capture the payment. For now, just create an empty object like this:
+
+```ts
+export const paypal = {};
+```
+
+## Generate Access Token
+
+Before we add the functions in the object, we need an access token. You can find the documentation about this here - https://developer.paypal.com/reference/get-an-access-token/.
+
+Let's create a function to get the access token. Add the following function under the paypal object:
+
+```ts
+// Generate an access token for the PayPal API
+async function generateAccessToken() {
+  const { PAYPAL_CLIENT_ID, PAYPAL_APP_SECRET } = process.env;
+  const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_APP_SECRET}`).toString(
+    'base64'
+  );
+
+  const response = await fetch(`${base}/v1/oauth2/token`, {
+    method: 'POST',
+    body: 'grant_type=client_credentials',
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  });
+
+  if (response.ok) {
+    const jsonData = await response.json();
+    return jsonData.access_token;
+  } else {
+    const errorMessage = await response.text();
+    throw new Error(errorMessage);
+  }
+}
+```
+
+We start by getting the client id and secret from the environment variables. We then create a base64 encoded string of the client id and secret. We then use that to make a request to the PayPal API to get an access token. If the response is ok, we return the access token. If not, we throw an error.
+
+## Quick Refactor For Handle Response
+
+Let's actually split this up a bit and create a separate function to handle the response. Because we will re-use this in another function.
+
+Replace this code:
+
+```ts
+if (response.ok) {
+  const jsonData = await response.json();
+  return jsonData.access_token;
+} else {
+  const errorMessage = await response.text();
+  throw new Error(errorMessage);
+}
+```
+
+With this:
+
+```ts
+const jsonData = await handleResponse(response);
+return jsonData.access_token;
+```
+
+Now create a function undernerath the `generateAccessToken` function:
+
+```ts
+async function handleResponse(response: any) {
+  if (response.status === 200 || response.status === 201) {
+    return response.json();
+  }
+  const errorMessage = await response.text();
+  throw new Error(errorMessage);
+}
+```
+
+In the next lesson, we will write some simple unit tests to test this out.
