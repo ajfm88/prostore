@@ -1,103 +1,99 @@
-# Generate PayPal Access Token
+# Testing Generate Access Token Function With Jest
 
-Now that we have our PayPal keys, we can start to implement PayPal payments. There are a few steps we need to take with the PayPal API. We need to:
+This is optional, but I figured it would be a nice addition to the course. We are going to use Jest to test our PayPal requests. Jest is a testing framework that allows you to write tests for your code. I just want to be able to test certain things such as generating the token for paypal before we write the actual code.
 
-- Generate an access token: This is a token that serves as a secure identifier, allowing your app to interact with PayPal's services on behalf of a user or merchant. It grants your application the necessary permissions to perform specific actions, such as creating orders, processing payments, or issuing refunds.
-- Create an order: Create an order and set the intent to "capture"
-- Capture payment: To successfully capture payment for an order, the buyer must first approve the order or a valid payment_source must be provided in the request. So typically, once we pay, the status gets set to approve.
+Run the following command to install Jest and some dependencies:
 
-That's what we're going to do in a nutshell. We will also write some unit tests with Jest to test these functions out.
-
-We are going to start by generating an access token.
-
-## Create The PayPal File
-
-Let's create a new file at `lib/paypal.ts`. This will contain the PayPal API calls.
-
-Let's start by creating a variable to hold the paypal api url.:
-
-```ts
-const base = process.env.PAYPAL_API_URL || 'https://api-m.sandbox.paypal.com';
+```bash
+npm install -D jest ts-jest ts-node @types/jest @types/node
 ```
 
-We will use this in all of our requests to the PayPal API.
+Run the following command to initialize Jest:
 
-## `paypal` Object
-
-We are going to have an object with a method to create and order and to capture the payment. For now, just create an empty object like this:
-
-```ts
-export const paypal = {};
+```bash
+npm init jest@latest
 ```
 
-## Generate Access Token
+You will be asked some questions. Here is what I selected:
 
-Before we add the functions in the object, we need an access token. You can find the documentation about this here - https://developer.paypal.com/reference/get-an-access-token/.
+- Would you like to run Jest as your 'test' script in package.json? ... Yes
+- Would you like to use Typescript for the configuration file? ... Yes
+- Choose the test environment that will be used for testing ... node
+- Do you want to add coverage reports? ... No
+- Which provider should be used to instrument code for coverage? ... v8
+- Automatically clear mock calls and instances between every test? ... Yes
 
-Let's create a function to get the access token. Add the following function under the paypal object:
+You now should have a `jest.config.ts` file in your project.
+
+Open the file and add the following option:
 
 ```ts
-// Generate an access token for the PayPal API
-async function generateAccessToken() {
-  const { PAYPAL_CLIENT_ID, PAYPAL_APP_SECRET } = process.env;
-  const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_APP_SECRET}`).toString(
-    'base64'
-  );
+preset: 'ts-jest',
+```
 
-  const response = await fetch(`${base}/v1/oauth2/token`, {
-    method: 'POST',
-    body: 'grant_type=client_credentials',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-  });
+Make sure you have the following in your `package.json`:
 
-  if (response.ok) {
-    const jsonData = await response.json();
-    return jsonData.access_token;
-  } else {
-    const errorMessage = await response.text();
-    throw new Error(errorMessage);
+```json
+{
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
   }
 }
 ```
 
-We start by getting the client id and secret from the environment variables. We then create a base64 encoded string of the client id and secret. We then use that to make a request to the PayPal API to get an access token. If the response is ok, we return the access token. If not, we throw an error.
+## `dotenv` Setup
 
-## Quick Refactor For Handle Response
+Since Jest runs in a separate environment, we need to set up `dotenv` to load our environment variables.
 
-Let's actually split this up a bit and create a separate function to handle the response. Because we will re-use this in another function.
+Install it as a development dependency:
 
-Replace this code:
-
-```ts
-if (response.ok) {
-  const jsonData = await response.json();
-  return jsonData.access_token;
-} else {
-  const errorMessage = await response.text();
-  throw new Error(errorMessage);
-}
+```bash
+npm install -D dotenv
 ```
 
-With this:
+Create a `jest.setup.ts` file in the root of your project and add the following:
 
 ```ts
-const jsonData = await handleResponse(response);
-return jsonData.access_token;
+require('dotenv').config();
 ```
 
-Now create a function undernerath the `generateAccessToken` function:
+Now in the `jest.config.ts` file, add the following:
 
 ```ts
-async function handleResponse(response: any) {
-  if (response.status === 200 || response.status === 201) {
-    return response.json();
-  }
-  const errorMessage = await response.text();
-  throw new Error(errorMessage);
-}
+ setupFiles: ['<rootDir>/jest.setup.ts'],
 ```
 
-In the next lesson, we will write some simple unit tests to test this out.
+## Writing The Test
+
+Where you put your tests is up to you. A common place is to create a test folder in the folder you are testing. Since we won't have a ton of tests, I'm just going to create a folder in the root of the project called `tests`.
+
+Let's create a test to make sure we can generate an access token. Create a file at `tests/paypal.test.ts` file and add the following:
+
+```ts
+import { generateAccessToken } from '../lib/paypal';
+
+// Generate a PayPal access token
+test('generates a PayPal access token', async () => {
+  const tokenResponse = await generateAccessToken();
+  console.log(tokenResponse);
+  // Should be a string that is not empty
+  expect(typeof tokenResponse).toBe('string');
+  expect(tokenResponse.length).toBeGreaterThan(0);
+});
+```
+
+You also need to export the function from the file. Open the `paypal.ts` file and add an export:
+
+```ts
+export async function generateAccessToken() {}
+```
+
+Now run the following command to run the test:
+
+```bash
+npm run test
+```
+
+You should see the log with the token in the console and the test should pass.
+
