@@ -17,15 +17,16 @@ const OrderDetailsPage = async (props: {
 
   const { id } = params;
 
-  const order = await getOrderById(id);
+  const order = (await getOrderById(id)) as Order | null;
   if (!order) notFound();
 
   return (
     <OrderDetailsTable
       order={{
-        ...(order as unknown as Order),
+        ...order,
         shippingAddress: order.shippingAddress as ShippingAddress,
       }}
+      paypalClientId={process.env.PAYPAL_CLIENT_ID || "sb"}
     />
   );
 };

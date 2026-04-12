@@ -1,135 +1,147 @@
-# Approve & Update Order Actions
+# Implement Paypal Button
 
-In order to be able to use PayPal, there are a couple other actions that we need to create. We need a `approvePayPalOrder` action and an `updateOrderToPaid` function.
+We have the backend functionality done to take PayPal payments, but we need to implement the PayPal button and the UI.
 
-## Approve Paypal Order Action
+We are going to use a package called `@paypal/react-paypal-js` to implement the PayPal button. Let's install it:
 
-This action is used to approve the order once payment has been made. IN the UI, when a user clicks to pay with PayPal, a 3rd party paypal window opens for the user to enter their PayPal credentials. All the secure payment stuff is done on the PayPal servers, not our application. Once the user has entered their credentials and payment is made, we get back the order id from PayPal and we need to approve the order. That's what this action is for.
+```bash
+npm install @paypal/react-paypal-js
+```
 
-Open the `lib/actions/order.actions.js` file and add the following function:
+Now let's open the `app/(root)/order/[id]/order-details.form.tsx` file.
 
-```javascript
-// Approve Paypal Order
-export async function approvePayPalOrder(
-  orderId: string,
-  data: { orderID: string }
-) {
-  try {
-    // Find the order in the database
-    const order = await prisma.order.findFirst({
-      where: {
-        id: orderId,
-      },
-    })
-    if (!order) throw new Error('Order not found')
+Add the following imports:
 
-    // Check if the order is already paid
-    const captureData = await paypal.capturePayment(data.orderID)
-    if (
-      !captureData ||
-      captureData.id !== (order.paymentResult as PaymentResult)?.id ||
-      captureData.status !== 'COMPLETED'
-    )
-      throw new Error('Error in paypal payment')
+```tsx
+import {
+  PayPalButtons,
+  PayPalScriptProvider,
+  usePayPalScriptReducer,
+} from '@paypal/react-paypal-js';
+```
 
-    //  @todo - Update order to paid
+Here is an overview of what these are:
 
-    revalidatePath(`/order/${orderId}`)
+- `PayPalButtons`: This is the component that will render the PayPal button.
+- `PayPalScriptProvider`: This is the component that will load the PayPal script. It ensures the SDK is loaded before any buttons or PayPal features are rendered.
+- `usePayPalScriptReducer`: This is a custom React hook that provides access to the state of the PayPal script. It allows you to dynamically control the loading state and settings of the PayPal SDK, which can be useful if you need to adjust configuration or show loading indicators while the SDK is being prepared.
 
-    return {
-      success: true,
-      message: 'Your order has been successfully paid by PayPal',
-    }
-  } catch (err) {
-    return { success: false, message: formatError(err) }
+We also want to import the 2 actions from the `order.actions.ts` file:
+
+```tsx
+import {
+  approvePayPalOrder,
+  createPayPalOrder,
+} from '@/lib/actions/order.actions';
+```
+
+## Pass In The PayPal Client ID
+
+This component will take the client ID as a prop. Open the file where it is embedded, which is the `app/(root)/order/[id]/page.tsx` file and add the following:
+
+```tsx
+return (
+  <OrderDetailsTable
+    order={{
+      ...order,
+      shippingAddress: order.shippingAddress as ShippingAddress,
+    }}
+    paypalClientId={process.env.PAYPAL_CLIENT_ID || 'sb'}
+  />
+);
+```
+
+We are passing the PayPal client ID as a prop to the `OrderDetailsTable` component.
+
+Now add it as a prop to the `OrderDetailsTable` component:
+
+```tsx
+const OrderDetailsTable = ({
+  order,
+  paypalClientId,
+}: {
+  order: Order;
+  paypalClientId: string;
+}) => {};
+```
+
+Right above the return, add the following code:
+
+```tsx
+// Checks the loading status of the PayPal script
+function PrintLoadingState() {
+  const [{ isPending, isRejected }] = usePayPalScriptReducer();
+  let status = '';
+  if (isPending) {
+    status = 'Loading PayPal...';
+  } else if (isRejected) {
+    status = 'Error in loading PayPal.';
   }
+  return status;
 }
 ```
 
-We are getting the order from the database, checking if the order is already paid by calling the `capturePayment` function from the `lib/paypal.ts` file. Now we need to update the order to paid. Let's create another action below it for that.
+This code checks the loading status of the PayPal script and returns a status message.
 
-Add the following function to the same file:
+Next, add the following function under the `PrintLoadingState` function:
 
-```javascript
-// Update Order to Paid in Database
-async function updateOrderToPaid({
-  orderId,
-  paymentResult,
-}: {
-  orderId: string;
-  paymentResult?: PaymentResult;
-}) {
-  // Find the order in the database and include the order items
-  const order = await prisma.order.findFirst({
-    where: {
-      id: orderId,
-    },
-    include: {
-      orderitems: true,
-    },
-  });
-
-  if (!order) throw new Error('Order not found');
-
-  if (order.isPaid) throw new Error('Order is already paid');
-
-  // Transaction to update the order and update the product quantities
-  await prisma.$transaction(async (tx) => {
-    // Update all item quantities in the database
-    for (const item of order.orderitems) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: -item.qty } },
-      });
-    }
-
-    // Set the order to paid
-    await tx.order.update({
-      where: { id: orderId },
-      data: {
-        isPaid: true,
-        paidAt: new Date(),
-        paymentResult,
-      },
+```tsx
+// Creates a PayPal order
+const handleCreatePayPalOrder = async () => {
+  const res = await createPayPalOrder(order.id);
+  if (!res.success)
+    return toast({
+      description: res.message,
+      variant: 'destructive',
     });
-  });
-
-  // Get the updated order after the transaction
-  const updatedOrder = await prisma.order.findFirst({
-    where: {
-      id: orderId,
-    },
-    include: {
-      orderitems: true,
-      user: { select: { name: true, email: true } },
-    },
-  });
-
-  if (!updatedOrder) {
-    throw new Error('Order not found');
-  }
+  return res.data;
 };
-
 ```
 
-This function takes in the order ID as well as data from the payment result that PayPal sends us. We are getting the order from the database, checking if the order is already paid, and updating the order to paid. We are also updating the product quantities in the database. We do this in a transaction so that if one of the updates fails, the entire transaction fails. So you don't end up with an order that is paid but the product quantities are not updated.
+This calls our `createPayPalOrder` action and returns the response.
 
-Now we have to call the `updateOrderToPaid` action from the `approvePayPalOrder` action. Replace the `@todo` comment with the following code:
+Finally, we need a function to call the approvePayPalOrder action:
 
-```javascript
-  // Update order to paid
-  await updateOrderToPaid({
-    orderId,
-    paymentResult: {
-      id: captureData.id,
-      status: captureData.status,
-      email_address: captureData.payer.email_address,
-      pricePaid:
-        captureData.purchase_units[0]?.payments?.captures[0]?.amount?.value,
-    },
+```tsx
+// Approves a PayPal order
+const handleApprovePayPalOrder = async (data: { orderID: string }) => {
+  const res = await approvePayPalOrder(order.id, data);
+  toast({
+    description: res.message,
+    variant: res.success ? 'default' : 'destructive',
   });
+};
 ```
 
-We are passing the order ID and a payment result with data from the PayPal capture payment.
+Now, down at the bottom, right above the closing `</CardContent>` tag, add the following:
 
-Our server actions are now complete, let's move on to the client and create the UI for the user to pay with PayPal.
+```tsx
+{
+  /* PayPal Payment */
+}
+{
+  !isPaid && paymentMethod === 'PayPal' && (
+    <div>
+      <PayPalScriptProvider options={{ clientId: paypalClientId }}>
+        <PrintLoadingState />
+        <PayPalButtons
+          createOrder={handleCreatePayPalOrder}
+          onApprove={handleApprovePayPalOrder}
+        />
+      </PayPalScriptProvider>
+    </div>
+  );
+}
+```
+
+We are checking to see if the order is paid. If it is not and the payment method is PayPal, we will render the PayPal button. THe button takes in the `createOrder` and `onApprove` props.
+
+## Test It Out
+
+Now click the pay with paypal button and use your sandbox account. There is no way to use real money while in sandbox mode so don't worry about that.
+
+One paid, you will be redirected to the order details page and you will see the order status as paid.
+
+<img src="../images/order-paid.png" alt="order paid" />
+
+That's it! You have successfully implemented the PayPal button.
