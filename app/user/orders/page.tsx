@@ -1,3 +1,7 @@
+import { Metadata } from "next";
+import { getMyOrders } from "@/lib/actions/order.actions";
+import { formatCurrency, formatDateTime, formatId } from "@/lib/utils";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -6,10 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getMyOrders } from "@/lib/actions/order.actions";
-import { formatCurrency, formatDateTime, formatId } from "@/lib/utils";
-import { Metadata } from "next";
-import Link from "next/link";
+import Pagination from "@/components/shared/pagination";
 
 export const metadata: Metadata = {
   title: "My Orders",
@@ -42,7 +43,7 @@ const OrdersPage = async (props: { searchParams: Promise<{ page: string }> }) =>
             {orders.data.map((order) => (
               <TableRow key={order.id}>
                 <TableCell>{formatId(order.id)}</TableCell>
-                <TableCell> {formatCurrency(order.totalPrice)}</TableCell>
+                <TableCell>{formatDateTime(order.createdAt).dateTime}</TableCell>
                 <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
                 <TableCell>
                   {order.isPaid && order.paidAt
@@ -63,6 +64,9 @@ const OrdersPage = async (props: { searchParams: Promise<{ page: string }> }) =>
             ))}
           </TableBody>
         </Table>
+        {orders.totalPages > 1 && (
+          <Pagination page={Number(page) || 1} totalPages={orders?.totalPages} />
+        )}
       </div>
     </div>
   );

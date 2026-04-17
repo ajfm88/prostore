@@ -1,97 +1,196 @@
-# User Orders Page
+# Orders Pagination
 
-Now we want to create the page to show the user's orders.
+Now we will add the pagination to the orders. We already have a PAGE_SIZE constant in the `constants.js` file. I have it set to 2. So I am going to go through the app and make sure I have at least 3 orders. You should do the same.
 
-Open the file `app/user/orders/page.tsx` and replace the contents with the following:
+## Pagination Component
+
+We are going to create a pagination component. Create a file at `components/shared/pagination.tsx` and add the following code:
 
 ```tsx
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { getMyOrders } from '@/lib/actions/order.actions';
-import { formatCurrency, formatDateTime, formatId } from '@/lib/utils';
-import { Metadata } from 'next';
-import Link from 'next/link';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'My Orders',
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Button } from '../ui/button';
+
+type PaginationProps = {
+  page: number | string;
+  totalPages: number;
+  urlParamName?: string;
+};
+const Pagination = ({ page, totalPages, urlParamName }: PaginationProps) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  return (
+    <div className='flex gap-2'>
+      <Button
+        size='lg'
+        variant='outline'
+        className='w-28'
+        disabled={Number(page) <= 1}
+      >
+        Previous
+      </Button>
+      <Button
+        size='lg'
+        variant='outline'
+        className='w-28'
+        disabled={Number(page) >= totalPages}
+      >
+        Next
+      </Button>
+    </div>
+  );
 };
 
-const OrdersPage = async (props: {
-  searchParams: Promise<{ page: string }>;
-}) => {
-  const {page } = await props.searchParams;
-  const orders = await getMyOrders({
-    page: Number(page) || 1,
-  });
-
-  console.log(orders);
-
-  return <>Orders</>;
-};
-
-export default OrdersPage;
+export default Pagination;
 ```
 
-We added all our imports, some metadata and passed in searchParams as a prop. We then set the page number to 1 if it's not provided and fetched the orders using the `getMyOrders` function. The `getMyOrders` function takes in the page number as a parameter. You could also pass in a limit to override whatever is in the `PAGE_SIZE` constant.
+We are going to use the `useRouter` and `useSearchParams` hooks from Next.js. We are going to pass in the `page`, `totalPages`, and `urlParamName` props. We are going to use the `useRouter` hook to get the router object. We are going to use the `useSearchParams` hook to get the search params object.
 
-We then logged the orders to the console and returned a placeholder text. You should see the orders in the server console.
+Then we return a div with two buttons. The first button is disabled if the page is less than or equal to 1. The second button is disabled if the page is greater than or equal to the total pages.
 
-Now let's create the UI for the orders page. Replace the return statement with the following:
+Before we add the rest of the functionality, let's add the component to the orders page.
+
+Open the `app/user/orders/page.tsx` file and import the pagination component:
+
+```tsx
+import Pagination from '@/components/shared/pagination';
+```
+
+Now under the closing `</Table>` element, add the following code:
+
+```tsx
+{
+  orders.totalPages > 1 && (
+    <Pagination page={Number(page) || 1} totalPages={orders?.totalPages} />
+  );
+}
+```
+
+We are checking to see if there are more than 1 page of orders. If there are, we are going to render the pagination component. We are going to pass in the `page` and `totalPages`.
+
+You should now see 2 orders and the buttons on the orders page. Right now, clicking the buttons will not do anything. We will add that functionality now.
+
+## Pagination Functionality
+
+Add the following click handler above the return statement:
+
+```tsx
+// Handle Page Change
+const onClick = (btnType: string) => {
+  const pageValue = btnType === 'next' ? Number(page) + 1 : Number(page) - 1;
+  console.log(pageValue);
+};
+```
+
+This function takes in a `btnType` parameter. If the `btnType` is `next`, we increment the page number by 1. If the `btnType` is `prev`, we decrement the page number by 1. We then log the new page number to the console.
+
+Add the handler to the buttons:
 
 ```tsx
 return (
-  <div className='space-y-2'>
-    <h2 className='h2-bold'>Orders</h2>
-    <div className='overflow-x-auto'>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>ID</TableHead>
-            <TableHead>DATE</TableHead>
-            <TableHead>TOTAL</TableHead>
-            <TableHead>PAID</TableHead>
-            <TableHead>DELIVERED</TableHead>
-            <TableHead>ACTIONS</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {orders.data.map((order) => (
-            <TableRow key={order.id}>
-              <TableCell>{formatId(order.id)}</TableCell>
-              <TableCell> {formatCurrency(order.totalPrice)}</TableCell>
-              <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
-              <TableCell>
-                {order.isPaid && order.paidAt
-                  ? formatDateTime(order.paidAt).dateTime
-                  : 'not paid'}
-              </TableCell>
-              <TableCell>
-                {order.isDelivered && order.deliveredAt
-                  ? formatDateTime(order.deliveredAt).dateTime
-                  : 'not delivered'}
-              </TableCell>
-              <TableCell>
-                <Link href={`/order/${order.id}`}>
-                  <span className='px-2'>Details</span>
-                </Link>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+  <div className='flex gap-2'>
+    <Button
+      size='lg'
+      variant='outline'
+      className='w-28'
+      onClick={() => onClick('prev')}
+      disabled={Number(page) <= 1}
+    >
+      Previous
+    </Button>
+    <Button
+      size='lg'
+      variant='outline'
+      className='w-28'
+      onClick={() => onClick('next')}
+      disabled={Number(page) >= totalPages}
+    >
+      Next
+    </Button>
   </div>
 );
 ```
 
-This is pretty straightforward. We're using the `Table` component from the `@/components/ui/table` package to display the orders in a table. We're also using the `formatCurrency` and `formatDateTime` functions from the `@/lib/utils` package to format the currency and date.
+Click on the next button and you should see the page number in the console.
 
-Now you should see the orders in the table.
+We need to build the URL to navigate to. To keep this clean, I'm going to create a utility function for this. We're also going to use the `query-string` package to build the URL. This package is used to parse and stringify query strings.
 
-Next, let's add the pagination.
+Open your terminal and type the following command:
+
+```bash
+npm install query-string
+```
+
+Open the `lib/utils.ts` file and add the following import:
+
+```tsx
+import qs from 'query-string';
+```
+
+Now add the following function to the file:
+
+```tsx
+// Form Pagination Links
+export function formUrlQuery({
+  params,
+  key,
+  value,
+}: {
+  params: string;
+  key: string;
+  value: string | null;
+}) {
+  const query = qs.parse(params);
+
+  query[key] = value;
+
+  return qs.stringifyUrl(
+    {
+      url: window.location.pathname,
+      query,
+    },
+    { skipNull: true }
+  );
+}
+```
+
+This function takes in 3 parameters:
+
+- params: a string representing the current URL’s query parameters. For instance, if we have the URL `https://example.com?page=1&limit=10`, the params would be `page=1&limit=10`.
+- key: a string representing the key to be updated in the query parameters. For instance, if we want to update the `page` parameter, the key would be `page`. That's what it will be by default.
+- value: a string representing the new value to be set for the key. For instance, if we want to update the `page` parameter to `2`, the value would be `2`.
+
+The function first parses the current URL's query parameters using `qs.parse(params)`. It then updates the specified key with the new value. Finally, it uses `qs.stringifyUrl` to build the new URL with the updated query parameters.
+
+The skipNull option in qs.stringifyUrl (from the qs library) ensures that query parameters with null values are omitted from the generated URL string.
+
+Now bring the function into the `components/shared/pagination.tsx` file and add the following import:
+
+```tsx
+import { formUrlQuery } from '@/lib/utils';
+```
+
+In the `onClick` function, add the following code:
+
+```tsx
+// Handle Page Change
+const onClick = (btnType: string) => {
+  const pageValue = btnType === 'next' ? Number(page) + 1 : Number(page) - 1;
+
+  const newUrl = formUrlQuery({
+    params: searchParams.toString(),
+    key: urlParamName || 'page',
+    value: pageValue.toString(),
+  });
+
+  router.push(newUrl, { scroll: false });
+};
+```
+
+This will build the URL with the new page number. Then we are just pushing the new URL to the router.
+
+You should now be able to click the next and previous buttons and see the page number change and see the correct orders.
+
+Now let's change the `PAGE_SIZE` constant to 10 in the `lib/constants/index.ts` file. Now you won't see the pagination until there are at least 11 orders.
