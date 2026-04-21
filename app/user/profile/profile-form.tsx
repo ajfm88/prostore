@@ -24,6 +24,31 @@ const ProfileForm = () => {
 
   const { toast } = useToast();
 
+  // Submit form to update profile
+  async function onSubmit(values: z.infer<typeof updateProfileSchema>) {
+    const res = await updateProfile(values);
+
+    if (!res.success)
+      return toast({
+        variant: "destructive",
+        description: res.message,
+      });
+
+    const newSession = {
+      ...session,
+      user: {
+        ...session?.user,
+        name: values.name,
+      },
+    };
+
+    await update(newSession);
+
+    toast({
+      description: res.message,
+    });
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-5">
