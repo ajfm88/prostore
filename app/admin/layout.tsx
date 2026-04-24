@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import Menu from "@/components/shared/header/menu";
-import MainNav from "./main-nav";
+import { MainNav } from "./main-nav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -14,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/" className="w-22">
               <Image src="/images/logo.svg" width={48} height={48} alt={`${APP_NAME} logo`} />
             </Link>
-            <MainNav className="mx-6" />;
+            <MainNav className="mx-6" />
             <div className="ml-auto flex items-center space-x-4">
               <div>
                 <Input
