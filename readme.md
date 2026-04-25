@@ -1,73 +1,147 @@
-# Get Order Summary
+# Overview Page With Recharts
 
-Now we want to get a summart of the orders that have been made on the site. Let's create a new action in the `lib/actions/order.actions.ts` file:
+Now we are going to take the data that we got in the action function and display it on the overview page.
 
-```ts
-// Get sales data and order summary
-export async function getOrderSummary() {
-  // Get counts for each resource
-  const ordersCount = await prisma.order.count();
-  const productsCount = await prisma.product.count();
-  const usersCount = await prisma.user.count();
+open the `app/admin/overview/page.tsx` file and add all of the imports:
 
-  // Calculate total sales
-  const totalSales = await prisma.order.aggregate({
-    _sum: { totalPrice: true },
-  });
+```tsx
+import { auth } from '@/auth';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getOrderSummary } from '@/lib/actions/order.actions';
+import { formatCurrency, formatDateTime, formatNumber } from '@/lib/utils';
+import { BadgeDollarSign, Barcode, CreditCard, Users } from 'lucide-react';
+import { Metadata } from 'next';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import Link from 'next/link';
+```
 
-  // Get monthly sales
-  const salesDataRaw = await prisma.$queryRaw<
-    Array<{ month: string; totalSales: Prisma.Decimal }>
-  >`SELECT to_char("createdAt", 'MM/YY') as "month", sum("totalPrice") as "totalSales" FROM "Order" GROUP BY to_char("createdAt", 'MM/YY')`;
+We need to create the `formatNumber` utility function, which is simple. Open the `lib/utils.ts` file and add the following code:
 
-  const salesData: SalesDataType = salesDataRaw.map((entry) => ({
-    month: entry.month,
-    totalSales: Number(entry.totalSales), // Convert Decimal to number
-  }));
-
-  // Get latest sales
-  const latestOrders = await prisma.order.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      user: { select: { name: true } },
-    },
-    take: 6,
-  });
-
-  return {
-    ordersCount,
-    productsCount,
-    usersCount,
-    totalSales,
-    latestOrders,
-    salesData,
-  };
+```tsx
+//  Format Numbers
+const NUMBER_FORMATTER = new Intl.NumberFormat('en-US');
+export function formatNumber(number: number) {
+  return NUMBER_FORMATTER.format(number);
 }
-
-
 ```
 
-Now just add the `SalesDataType` above this function:
+All this does is format a number to a string with commas using the `Intl.NumberFormat` class.
 
-```ts
-type SalesDataType = {
-  month: string;
-  totalSales: number;
-}[]
+Now, back in the `app/admin/overview/page.tsx` file, add the following code:
+
+```tsx
+const AdminOverviewPage = async () => {
+  const session = await auth();
+
+  // Make sure the user is an admin
+  if (session?.user.role !== 'admin')
+    throw new Error('admin permission required');
+
+  // Get order summary
+  const summary = await getOrderSummary();
+
+  return (
+    <div className='space-y-2'>
+      <h1 className='h2-bold'>Dashboard</h1>
+      <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
+        <Card>
+          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+            <CardTitle className='text-sm font-medium'>Total Revenue</CardTitle>
+            <BadgeDollarSign />
+          </CardHeader>
+          <CardContent>
+            <div className='text-2xl font-bold'>
+              {formatCurrency(summary.totalSales._sum.totalPrice!.toString())}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+            <CardTitle className='text-sm font-medium'>Sales</CardTitle>
+            <CreditCard />
+          </CardHeader>
+          <CardContent>
+            <div className='text-2xl font-bold'>
+              {formatNumber(summary.ordersCount)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+            <CardTitle className='text-sm font-medium'>Customers</CardTitle>
+            <Users />
+          </CardHeader>
+          <CardContent>
+            <div className='text-2xl font-bold'>{summary.usersCount}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+            <CardTitle className='text-sm font-medium'>Products</CardTitle>
+            <Barcode />
+          </CardHeader>
+          <CardContent>
+            <div className='text-2xl font-bold'>{summary.productsCount}</div>
+          </CardContent>
+        </Card>
+      </div>
+      <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-7'>
+        <Card className='col-span-4'>
+          <CardHeader>
+            <CardTitle>Overview</CardTitle>
+          </CardHeader>
+          <CardContent className='pl-2'>
+             {/* CHART */}
+          </CardContent>
+        </Card>
+        <Card className='col-span-3'>
+          <CardHeader>
+            <CardTitle>Recent Sales</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>BUYER</TableHead>
+                  <TableHead>DATE</TableHead>
+                  <TableHead>TOTAL</TableHead>
+                  <TableHead>ACTIONS</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summary.latestOrders.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell>
+                      {order.user?.name ? order.user.name : 'Deleted user'}
+                    </TableCell>
+                    <TableCell>
+                      {formatDateTime(order.createdAt).dateOnly}
+                    </TableCell>
+                    <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
+                    <TableCell>
+                      <Link href={`/order/${order.id}`}>
+                        <span className='px-2'>Details</span>
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default AdminOverviewPage;
 ```
 
-Let's go over this function step by step.
-
-First, we get the total number of orders, products, and users.
-
-Then we use the `aggregate` method to calculate the total sales by summing up the totalPrice field across all orders.
-
-Then we retrieve monthly sales data, grouped by month and year (formatted as MM/YY). We do this by using the `$queryRaw` method to execute a raw SQL query.
-
-We need to convert the Decimal type from Prisma to a number.
-
-Finally, we fetch the latest 6 orders, sorted by creation date in descending order. We include the user's name for each order.
-
-We return all the gathered data in a single object. The salesData is of type `salesDataType` which is defined above the function.
-
-Next, I want to use this data to display some charts using the Rechart library. Let's do that in the next lesson.
+We are getting the session and making sure the user is admin. We are also getting the order summary and displaying the data on the page. I just put a comment where the chart will go for now. Let's add that next.
