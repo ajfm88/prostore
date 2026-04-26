@@ -1,147 +1,89 @@
-# Overview Page With Recharts
+# Monthly Sales Chart
 
-Now we are going to take the data that we got in the action function and display it on the overview page.
+Now we are going to create the monthly sales chart on the admin overview page.
 
-open the `app/admin/overview/page.tsx` file and add all of the imports:
+First, we need to install Recharts. Open a terminal and type the following:
 
-```tsx
-import { auth } from '@/auth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getOrderSummary } from '@/lib/actions/order.actions';
-import { formatCurrency, formatDateTime, formatNumber } from '@/lib/utils';
-import { BadgeDollarSign, Barcode, CreditCard, Users } from 'lucide-react';
-import { Metadata } from 'next';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import Link from 'next/link';
+```bash
+npm install recharts
 ```
 
-We need to create the `formatNumber` utility function, which is simple. Open the `lib/utils.ts` file and add the following code:
+Now create a file at `app/admin/overview/charts.tsx` and add the following code:
 
 ```tsx
-//  Format Numbers
-const NUMBER_FORMATTER = new Intl.NumberFormat('en-US');
-export function formatNumber(number: number) {
-  return NUMBER_FORMATTER.format(number);
-}
-```
+'use client';
 
-All this does is format a number to a string with commas using the `Intl.NumberFormat` class.
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 
-Now, back in the `app/admin/overview/page.tsx` file, add the following code:
-
-```tsx
-const AdminOverviewPage = async () => {
-  const session = await auth();
-
-  // Make sure the user is an admin
-  if (session?.user.role !== 'admin')
-    throw new Error('admin permission required');
-
-  // Get order summary
-  const summary = await getOrderSummary();
-
+const Charts = ({
+  data: { salesData },
+}: {
+  data: { salesData: { month: string; totalSales: number }[] };
+}) => {
   return (
-    <div className='space-y-2'>
-      <h1 className='h2-bold'>Dashboard</h1>
-      <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
-        <Card>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-sm font-medium'>Total Revenue</CardTitle>
-            <BadgeDollarSign />
-          </CardHeader>
-          <CardContent>
-            <div className='text-2xl font-bold'>
-              {formatCurrency(summary.totalSales._sum.totalPrice!.toString())}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-sm font-medium'>Sales</CardTitle>
-            <CreditCard />
-          </CardHeader>
-          <CardContent>
-            <div className='text-2xl font-bold'>
-              {formatNumber(summary.ordersCount)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-sm font-medium'>Customers</CardTitle>
-            <Users />
-          </CardHeader>
-          <CardContent>
-            <div className='text-2xl font-bold'>{summary.usersCount}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-sm font-medium'>Products</CardTitle>
-            <Barcode />
-          </CardHeader>
-          <CardContent>
-            <div className='text-2xl font-bold'>{summary.productsCount}</div>
-          </CardContent>
-        </Card>
-      </div>
+    <ResponsiveContainer width='100%' height={350}>
+      <BarChart data={salesData}>
+        <XAxis
+          dataKey='month'
+          stroke='#888888'
+          fontSize={12}
+          tickLine={false}
+          axisLine={false}
+        />
+        <YAxis
+          stroke='#888888'
+          fontSize={12}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={(value) => `$${value}`}
+        />
+        <Bar
+          dataKey='totalSales'
+          fill='currentColor'
+          radius={[4, 4, 0, 0]}
+          className='fill-primary'
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+};
+
+export default Charts;
+```
+
+What we are doing is taking in the sales data from the action function and passing it to the chart. We are also using the `ResponsiveContainer` component to make the chart responsive. We are using the `BarChart` component to create the chart. We are using the `XAxis` and `YAxis` components to create the x and y axis. Finally, we are using the `Bar` component to create the bars in the chart.
+
+## Showing The Chart
+
+Now go to the `app/admin/overview/page.tsx` file and import the `Charts` component:
+
+```tsx
+import Charts from './charts';
+
+```
+
+Now add it in the card and pass in the sales data:
+
+```tsx
       <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-7'>
         <Card className='col-span-4'>
           <CardHeader>
             <CardTitle>Overview</CardTitle>
           </CardHeader>
           <CardContent className='pl-2'>
-             {/* CHART */}
+            <Charts
+              data={{
+                salesData: summary.salesData,
+              }}
+            />
           </CardContent>
         </Card>
-        <Card className='col-span-3'>
-          <CardHeader>
-            <CardTitle>Recent Sales</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>BUYER</TableHead>
-                  <TableHead>DATE</TableHead>
-                  <TableHead>TOTAL</TableHead>
-                  <TableHead>ACTIONS</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {summary.latestOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell>
-                      {order.user?.name ? order.user.name : 'Deleted user'}
-                    </TableCell>
-                    <TableCell>
-                      {formatDateTime(order.createdAt).dateOnly}
-                    </TableCell>
-                    <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
-                    <TableCell>
-                      <Link href={`/order/${order.id}`}>
-                        <span className='px-2'>Details</span>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        //..
       </div>
-    </div>
-  );
-};
-
-export default AdminOverviewPage;
 ```
 
-We are getting the session and making sure the user is admin. We are also getting the order summary and displaying the data on the page. I just put a comment where the chart will go for now. Let's add that next.
+Your dashboard should look like this:
+
+<img src="images/admin-dashboard.png" alt="dashboard" />
+
+Let's move on the the admin orders.
