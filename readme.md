@@ -1,89 +1,81 @@
-# Monthly Sales Chart
+# Admin Route Guard
 
-Now we are going to create the monthly sales chart on the admin overview page.
+Right now, any user can access the admin screens by typing the URL in the browser. We need to add a route guard to protect the admin screens from unauthorized users.
 
-First, we need to install Recharts. Open a terminal and type the following:
-
-```bash
-npm install recharts
-```
-
-Now create a file at `app/admin/overview/charts.tsx` and add the following code:
+Create a new file at `app/lib/auth-guard.ts` and add the following code:
 
 ```tsx
-'use client';
+import { auth } from '@/auth';
+import { redirect } from 'next/navigation';
 
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+export async function requireAdmin() {
+  const session = await auth();
 
-const Charts = ({
-  data: { salesData },
-}: {
-  data: { salesData: { month: string; totalSales: number }[] };
-}) => {
-  return (
-    <ResponsiveContainer width='100%' height={350}>
-      <BarChart data={salesData}>
-        <XAxis
-          dataKey='month'
-          stroke='#888888'
-          fontSize={12}
-          tickLine={false}
-          axisLine={false}
-        />
-        <YAxis
-          stroke='#888888'
-          fontSize={12}
-          tickLine={false}
-          axisLine={false}
-          tickFormatter={(value) => `$${value}`}
-        />
-        <Bar
-          dataKey='totalSales'
-          fill='currentColor'
-          radius={[4, 4, 0, 0]}
-          className='fill-primary'
-        />
-      </BarChart>
-    </ResponsiveContainer>
-  );
+  if (session?.user?.role !== 'admin') {
+    redirect('/unauthorized');
+  }
+
+  return session;
+}
+```
+
+We are just checking if the user is an admin and redirecting to the unauthorized page if they are not.
+
+## Create Unauthrorized Page
+
+Now let's create the unauthorized page. Create a file at `app/unauthorized/page.tsx` and add the following:
+
+```tsx
+import { Button } from '@/components/ui/button';
+import { Metadata } from 'next';
+import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Unauthorized Access',
 };
 
-export default Charts;
+export default function UnauthorizedPage() {
+  return (
+    <div className='container mx-auto flex h-[calc(100vh-200px)] flex-col items-center justify-center space-y-4'>
+      <h1 className='h1-bold text-4xl'>Unauthorized Access</h1>
+      <p className='text-muted-foreground'>
+        You do not have permission to access this page.
+      </p>
+      <Button asChild>
+        <Link href='/'>Return Home</Link>
+      </Button>
+    </div>
+  );
+}
 ```
 
-What we are doing is taking in the sales data from the action function and passing it to the chart. We are also using the `ResponsiveContainer` component to make the chart responsive. We are using the `BarChart` component to create the chart. We are using the `XAxis` and `YAxis` components to create the x and y axis. Finally, we are using the `Bar` component to create the bars in the chart.
+## Protect Admin Routes
 
-## Showing The Chart
+Now we need to bring in the `requireAdmin` function and use it to protect the admin routes. You may be tempted to use it in the admin layout rather than the individual pages, however, it isn't recommended. When you first go to the page it runs and renders the entire page but if you go to another admin page, you're essentially just fetching a server component and not getting a hard refresh with a new HTML page and the layout will not re-render.
 
-Now go to the `app/admin/overview/page.tsx` file and import the `Charts` component:
+So what we're going to do is use the `requireAdmin` function in each admin page to protect it. You just need to require it and call it at the top of the function.
+
+Open `app/admin/overview/page.tsx` and add the following:
 
 ```tsx
-import Charts from './charts';
-
+import { requireAdmin } from '@/lib/auth-guard';
 ```
 
-Now add it in the card and pass in the sales data:
+Then call the function at the top of the function:
 
 ```tsx
-      <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-7'>
-        <Card className='col-span-4'>
-          <CardHeader>
-            <CardTitle>Overview</CardTitle>
-          </CardHeader>
-          <CardContent className='pl-2'>
-            <Charts
-              data={{
-                salesData: summary.salesData,
-              }}
-            />
-          </CardContent>
-        </Card>
-        //..
-      </div>
+const AdminOverviewPage = async () => {
+  await requireAdmin();
+  // ...
+};
 ```
 
-Your dashboard should look like this:
+You want to do the same forall admin pages. I know you may have not created these pages yet, however I had to go back and add this lesson, so just be sure to call `requireAdmin` at the top of the function for the following pages when you create them:
 
-<img src="images/admin-dashboard.png" alt="dashboard" />
-
-Let's move on the the admin orders.
+- `app/admin/users/page.tsx`
+- `app/admin/users/[id]/page.tsx`
+- `app/admin/products/page.tsx`
+- `app/admin/products/[id]/page.tsx`
+- `app/admin/products/create/page.tsx`
+- `app/admin/orders/page.tsx`
+- `app/admin/overview/page.tsx`
