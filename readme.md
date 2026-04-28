@@ -1,81 +1,119 @@
-# Admin Route Guard
+# Get Orders For Admin
 
-Right now, any user can access the admin screens by typing the URL in the browser. We need to add a route guard to protect the admin screens from unauthorized users.
+We have our admin section with the overview and some charts. Now we want the orders section to work. Let's start by creating the action to get all orders.
 
-Create a new file at `app/lib/auth-guard.ts` and add the following code:
+Open the `lib/actions/orders.actions.ts` file and add the following code:
 
-```tsx
-import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
+```ts
+// Get All Orders (Admin)
+export async function getAllOrders({ limit = PAGE_SIZE, page }: { limit?: number; page: number }) {
+  const data = await prisma.order.findMany({
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    skip: (page - 1) * limit,
+    include: { user: { select: { name: true } } },
+  });
 
-export async function requireAdmin() {
-  const session = await auth();
+  const dataCount = await prisma.order.count();
 
-  if (session?.user?.role !== 'admin') {
-    redirect('/unauthorized');
-  }
-
-  return session;
+  return {
+    data,
+    totalPages: Math.ceil(dataCount / limit),
+  };
 }
 ```
 
-We are just checking if the user is an admin and redirecting to the unauthorized page if they are not.
+We are using pagination for the order list, so we take in a limit that is set to the `PAGE_SIZE` constant and a page number. We then use the Prisma `findMany` method to get all orders. We also include the user name in the order so we can display it in the order list. We also get the total number of orders so we can calculate the total number of pages.
 
-## Create Unauthrorized Page
-
-Now let's create the unauthorized page. Create a file at `app/unauthorized/page.tsx` and add the following:
+Now let's create the page where we will display the orders. Create a new file called `app/admin/orders/page.tsx` and add the following code:
 
 ```tsx
-import { Button } from '@/components/ui/button';
-import { Metadata } from 'next';
-import Link from 'next/link';
+import { auth } from "@/auth";
+import { getAllOrders } from "@/lib/actions/order.actions";
+import { Metadata } from "next";
+import { requireAdmin } from "@/lib/auth-guard";
 
 export const metadata: Metadata = {
-  title: 'Unauthorized Access',
+  title: "Admin Orders",
 };
 
-export default function UnauthorizedPage() {
-  return (
-    <div className='container mx-auto flex h-[calc(100vh-200px)] flex-col items-center justify-center space-y-4'>
-      <h1 className='h1-bold text-4xl'>Unauthorized Access</h1>
-      <p className='text-muted-foreground'>
-        You do not have permission to access this page.
-      </p>
-      <Button asChild>
-        <Link href='/'>Return Home</Link>
-      </Button>
-    </div>
-  );
-}
-```
-
-## Protect Admin Routes
-
-Now we need to bring in the `requireAdmin` function and use it to protect the admin routes. You may be tempted to use it in the admin layout rather than the individual pages, however, it isn't recommended. When you first go to the page it runs and renders the entire page but if you go to another admin page, you're essentially just fetching a server component and not getting a hard refresh with a new HTML page and the layout will not re-render.
-
-So what we're going to do is use the `requireAdmin` function in each admin page to protect it. You just need to require it and call it at the top of the function.
-
-Open `app/admin/overview/page.tsx` and add the following:
-
-```tsx
-import { requireAdmin } from '@/lib/auth-guard';
-```
-
-Then call the function at the top of the function:
-
-```tsx
-const AdminOverviewPage = async () => {
+const OrdersPage = async (props: { searchParams: Promise<{ page: string }> }) => {
   await requireAdmin();
-  // ...
+  const { page = "1" } = await props.searchParams;
+
+  const session = await auth();
+  if (session?.user.role !== "admin") throw new Error("admin permission required");
+
+  const orders = await getAllOrders({
+    page: Number(page),
+  });
+
+  console.log(orders);
+
+  return <div>Orders</div>;
 };
+
+export default OrdersPage;
 ```
 
-You want to do the same forall admin pages. I know you may have not created these pages yet, however I had to go back and add this lesson, so just be sure to call `requireAdmin` at the top of the function for the following pages when you create them:
+We are getting the `page` from the search params and passing it to the `getAllOrders` action. We are also checking if the user is an admin. If not we throw an error. We are also logging the orders to the console.
 
-- `app/admin/users/page.tsx`
-- `app/admin/users/[id]/page.tsx`
-- `app/admin/products/page.tsx`
-- `app/admin/products/[id]/page.tsx`
-- `app/admin/products/create/page.tsx`
-- `app/admin/orders/page.tsx`
-- `app/admin/overview/page.tsx`
+## Show Orders Table
+
+Delete the console and let's show the orders in a table.
+
+Add the following to the return statement:
+
+```tsx
+return (
+  <div className="space-y-2">
+    <h2 className="h2-bold">Orders</h2>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>ID</TableHead>
+            <TableHead>DATE</TableHead>
+            <TableHead>TOTAL</TableHead>
+            <TableHead>PAID</TableHead>
+            <TableHead>DELIVERED</TableHead>
+            <TableHead>ACTIONS</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {orders.data.map((order) => (
+            <TableRow key={order.id}>
+              <TableCell>{formatId(order.id)}</TableCell>
+              <TableCell>{formatDateTime(order.createdAt).dateTime}</TableCell>
+              <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
+              <TableCell>
+                {order.isPaid && order.paidAt ? formatDateTime(order.paidAt).dateTime : "Not Paid"}
+              </TableCell>
+              <TableCell>
+                {order.isDelivered && order.deliveredAt
+                  ? formatDateTime(order.deliveredAt).dateTime
+                  : "Not Delivered"}
+              </TableCell>
+              <TableCell>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/order/${order.id}`}>Details</Link>
+                </Button>
+                {/* DELETE */}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {orders.totalPages > 1 && (
+        <Pagination page={Number(page) || 1} totalPages={orders?.totalPages} />
+      )}
+    </div>
+  </div>
+);
+```
+
+We are simply showing the orders in a table. We are mapping over the orders to show each one. We are using the `formatId` utility function to format the order ID. We are using the `formatDateTime` utility function to format the date and time. We are using the `formatCurrency` utility function to format the total price. There is a comment where the delete button will go.
+
+Now you should see the orders and if there are more than 10 or whatever you set PAGE_SIZE to, you will see the pagination component.
+
+Let's work on the delete next.
