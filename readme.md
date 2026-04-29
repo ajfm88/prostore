@@ -1,119 +1,164 @@
-# Get Orders For Admin
+# Delete Order (Admin)
 
-We have our admin section with the overview and some charts. Now we want the orders section to work. Let's start by creating the action to get all orders.
+Admins can now see all of the orders that have been placed. Now we want to show delete buttons on each order.
 
-Open the `lib/actions/orders.actions.ts` file and add the following code:
+## Delete Action
+
+First off, we need an action to delete the order. Open the `lib/actions/orders.actions.ts`
+file and add the following function:
 
 ```ts
-// Get All Orders (Admin)
-export async function getAllOrders({ limit = PAGE_SIZE, page }: { limit?: number; page: number }) {
-  const data = await prisma.order.findMany({
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    skip: (page - 1) * limit,
-    include: { user: { select: { name: true } } },
-  });
+// Delete Order
+export async function deleteOrder(id: string) {
+  try {
+    await prisma.order.delete({ where: { id } });
 
-  const dataCount = await prisma.order.count();
+    revalidatePath('/admin/orders');
 
-  return {
-    data,
-    totalPages: Math.ceil(dataCount / limit),
-  };
+    return {
+      success: true,
+      message: 'Order deleted successfully',
+    };
+  } catch (error) {
+    return { success: false, message: formatError(error) };
+  }
 }
 ```
 
-We are using pagination for the order list, so we take in a limit that is set to the `PAGE_SIZE` constant and a page number. We then use the Prisma `findMany` method to get all orders. We also include the user name in the order so we can display it in the order list. We also get the total number of orders so we can calculate the total number of pages.
+This is very simple. We are using the Prisma `delete` method to delete the order. We are also using the `revalidatePath` method to revalidate the path `/admin/orders`. This will update the orders page after the order has been deleted.
 
-Now let's create the page where we will display the orders. Create a new file called `app/admin/orders/page.tsx` and add the following code:
+## Delete Dialog Component
 
-```tsx
-import { auth } from "@/auth";
-import { getAllOrders } from "@/lib/actions/order.actions";
-import { Metadata } from "next";
-import { requireAdmin } from "@/lib/auth-guard";
+We are going to create a custom component for the delete dialog, but we will get some help from ShadCN, which has dialog components.
 
-export const metadata: Metadata = {
-  title: "Admin Orders",
-};
+Install the following from your terminal:
 
-const OrdersPage = async (props: { searchParams: Promise<{ page: string }> }) => {
-  await requireAdmin();
-  const { page = "1" } = await props.searchParams;
-
-  const session = await auth();
-  if (session?.user.role !== "admin") throw new Error("admin permission required");
-
-  const orders = await getAllOrders({
-    page: Number(page),
-  });
-
-  console.log(orders);
-
-  return <div>Orders</div>;
-};
-
-export default OrdersPage;
+```bash
+npx shadcn@latest add dialog
+npx shadcn@latest add alert-dialog
 ```
 
-We are getting the `page` from the search params and passing it to the `getAllOrders` action. We are also checking if the user is an admin. If not we throw an error. We are also logging the orders to the console.
+Now let's create a new component at `components/shared/delete-dialog.tsx` and add the following code:
 
-## Show Orders Table
+```tsx
+'use client';
 
-Delete the console and let's show the orders in a table.
+import { useState, useTransition } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '../ui/alert-dialog';
+import { Button } from '../ui/button';
 
-Add the following to the return statement:
+export default function DeleteDialog({
+  id,
+  action,
+}: {
+  id: string;
+  action: (id: string) => Promise<{ success: boolean; message: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  return <div>Dialog</div>;
+}
+```
+
+We are just bringing in all the imports and creating the component function, which takes in an id and an action. The action is a function that will be called when the delete button is clicked. It returns a promise, which returns an object with a success property and a message property.
+
+We are setting some state for the dialog and using the `useTransition` hook to handle the transition of the dialog. We are also using the `useToast` hook to show a toast message after the order has been deleted.
+
+Open the `admin/orders/page.tsx` file and import both the delete action and the dialog component:
+
+```tsx
+import { deleteOrder, getAllOrders } from '@/lib/actions/order.actions';
+import DeleteDialog from '@/components/shared/delete-dialog';
+```
+
+Add the component just under the ending `</Button>` for the details button and pass in the id and the action:
+
+```tsx
+<TableCell className='flex gap-1'>
+  <Button asChild variant='outline' size='sm'>
+    <Link href={`/order/${order.id}`}>Details</Link>
+  </Button>
+  <DeleteDialog id={order.id} action={deleteOrder} /> // 👈 Add this line
+</TableCell>
+```
+
+You should just see the text, "Dialog" in the UI. Now let's go back to the `delete-dialog.tsx` file and add the following code in the return statement:
 
 ```tsx
 return (
-  <div className="space-y-2">
-    <h2 className="h2-bold">Orders</h2>
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>ID</TableHead>
-            <TableHead>DATE</TableHead>
-            <TableHead>TOTAL</TableHead>
-            <TableHead>PAID</TableHead>
-            <TableHead>DELIVERED</TableHead>
-            <TableHead>ACTIONS</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {orders.data.map((order) => (
-            <TableRow key={order.id}>
-              <TableCell>{formatId(order.id)}</TableCell>
-              <TableCell>{formatDateTime(order.createdAt).dateTime}</TableCell>
-              <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
-              <TableCell>
-                {order.isPaid && order.paidAt ? formatDateTime(order.paidAt).dateTime : "Not Paid"}
-              </TableCell>
-              <TableCell>
-                {order.isDelivered && order.deliveredAt
-                  ? formatDateTime(order.deliveredAt).dateTime
-                  : "Not Delivered"}
-              </TableCell>
-              <TableCell>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/order/${order.id}`}>Details</Link>
-                </Button>
-                {/* DELETE */}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {orders.totalPages > 1 && (
-        <Pagination page={Number(page) || 1} totalPages={orders?.totalPages} />
-      )}
-    </div>
-  </div>
+  <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialogTrigger asChild>
+      <Button size='sm' variant='outline'>
+        Delete
+      </Button>
+    </AlertDialogTrigger>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This action cannot be undone.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <Button variant='destructive' size='sm' disabled={isPending}>
+          {isPending ? 'Deleting...' : 'Delete'}
+        </Button>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 );
 ```
 
-We are simply showing the orders in a table. We are mapping over the orders to show each one. We are using the `formatId` utility function to format the order ID. We are using the `formatDateTime` utility function to format the date and time. We are using the `formatCurrency` utility function to format the total price. There is a comment where the delete button will go.
+Now you should see the button, but it still doesn't do anything. Let's add a click handler function right above the return statement:
 
-Now you should see the orders and if there are more than 10 or whatever you set PAGE_SIZE to, you will see the pagination component.
+```tsx
+// Handle delete order button click
+const handleDeleteClick = () => {
+  startTransition(async () => {
+    const res = await action(id);
+    if (!res.success) {
+      toast({
+        variant: 'destructive',
+        description: res.message,
+      });
+    } else {
+      setOpen(false);
+      toast({
+        description: res.message,
+      });
+    }
+  });
+};
+```
 
-Let's work on the delete next.
+Now add it to the button:
+
+```tsx
+<Button
+  variant='destructive'
+  size='sm'
+  disabled={isPending}
+  onClick={handleDeleteClick}
+>
+  {isPending ? 'Deleting...' : 'Delete'}
+</Button>
+```
+
+We are using the `startTransition` hook to handle the transition of the dialog. We are also using the `useToast` hook to show a toast message after the order has been deleted.
+
+The reason that we are passing in the `deleteOrder` action instead of just bringing it in is because we may want to use this dialog in other places do run other actions.
+
+You should now be able to delete an order. Go ahead and try it out.
