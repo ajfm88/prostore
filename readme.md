@@ -1,126 +1,46 @@
-# Display Products
+# Delete Products From Admin Area
 
-In the last lesson, we were able to create an action to get all the products and then have them log in the console from the page we created. Now we want to display them in the page.
+Now let's add the delete functionality. We need an action to delete the product. Let's open the `lib/actions/product.action.ts` file and add the following:
 
-Add the following imports to the top of the `app/admin/products/page.tsx` file:
+```ts
+// Delete Product
+export async function deleteProduct(id: string) {
+  try {
+    const productExists = await prisma.product.findFirst({
+      where: { id },
+    });
 
-```tsx
-import Link from 'next/link';
-import Pagination from '@/components/shared/pagination';
-import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { getAllProducts } from '@/lib/actions/product.actions';
-import { formatCurrency, formatId } from '@/lib/utils';
+    if (!productExists) throw new Error('Product not found');
+
+    await prisma.product.delete({ where: { id } });
+
+    revalidatePath('/admin/products');
+
+    return {
+      success: true,
+      message: 'Product deleted successfully',
+    };
+  } catch (error) {
+    return { success: false, message: formatError(error) };
+  }
+}
 ```
 
-Let's add a button to create a product at the top. It won't do anything yet, but we will add the functionality soon:
+We check to see if the product exists and if it does, we delete it and revalidate the path. This will update the products page after the product has been deleted.
+
+We already created a component at `components/shared/delete-dialog.tsx` that we can use to delete the product. Let's import it and use it in the page.
+
+Go into `app/admin/products/page.tsx` and import both the delete dialog and the action:
 
 ```tsx
-return (
-  <div className='space-y-2'>
-    <div className='flex-between'>
-      <h1 className='h2-bold'>Products</h1>
-      <Button asChild variant='default'>
-        <Link href='/admin/products/create'>Create Product</Link>
-      </Button>
-    </div>
-  </div>
-);
+import { getAllProducts, deleteProduct } from '@/lib/actions/product.actions';
+import DeleteDialog from '@/components/shared/delete-dialog';
 ```
 
-Now under the first ending `</div>` add another div with the `Table` component from ShadCN. The entire page should look like this:
+Noe replace the comment with the actual delete dialog. Right under the edit button, add the following:
 
 ```tsx
-import Link from 'next/link';
-import Pagination from '@/components/shared/pagination';
-import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { getAllProducts } from '@/lib/actions/product.actions';
-import { formatCurrency, formatId } from '@/lib/utils';
-
-const AdminProductsPage = async (props: {
-  searchParams: Promise<{
-    page: string;
-    query: string;
-  }>;
-}) => {
-  const searchParams = await props.searchParams;
-
-  const page = Number(searchParams.page) || 1;
-  const searchText = searchParams.query || '';
-  const category = searchParams.category || '';
-
-  const products = await getAllProducts({
-    query: searchText,
-    page,
-    category,
-  });
-
-  return (
-    <div className='space-y-2'>
-      <div className='flex-between'>
-        <h1 className='h2-bold'>Products</h1>
-        <Button asChild variant='default'>
-          <Link href='/admin/products/create'>Create Product</Link>
-        </Button>
-      </div>
-      <div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>NAME</TableHead>
-              <TableHead className='text-right'>PRICE</TableHead>
-              <TableHead>CATEGORY</TableHead>
-              <TableHead>STOCK</TableHead>
-              <TableHead>RATING</TableHead>
-              <TableHead className='w-[100px]'>ACTIONS</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {products?.data.map((product) => (
-              <TableRow key={product.id}>
-                <TableCell>{formatId(product.id)}</TableCell>
-                <TableCell>{product.name}</TableCell>
-                <TableCell className='text-right'>
-                  {formatCurrency(product.price)}
-                </TableCell>
-                <TableCell>{product.category}</TableCell>
-                <TableCell>{product.stock}</TableCell>
-                <TableCell>{product.rating}</TableCell>
-                <TableCell className='flex gap-1'>
-                  <Button asChild variant='outline' size='sm'>
-                    <Link href={`/admin/products/${product.id}`}>Edit</Link>
-                  </Button>
-                  {/* DELETE HERE */}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {products?.totalPages && products.totalPages > 1 && (
-          <Pagination page={page} totalPages={products.totalPages} />
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default AdminProductsPage;
+<DeleteDialog id={product.id} action={deleteProduct} />
 ```
 
-We are just mapping over the products and displaying them in the table. We also added a button to edit the product, which we will work on later. I put a comment where the delete dialog will go for now. You should also see the pagination as long as you have more products than the PAGE_SIZE. To test, change the `PAGE_SIZE` in the `constant/index.ts` file to a smaller number, like 2.
+Now when you click the delete button, it will open the dialog and ask you to confirm that you want to delete the product. If you click yes, it will delete the product and revalidate the path.
