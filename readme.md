@@ -1,108 +1,176 @@
-# Create & Update Product Actions
+# Create Product Page
 
-We want to be able to create and update products. Products are created by admins and they will have images associated with them. However, I want to first just be able to create and update products without images. Then once we get the form working, we will integrate image uploading with "Uploadthing".
+Now let's work on the page and UI to create a new product.
 
-## Zod Schema
+Create a file at `app/admin/products/create/page.tsx` with the following code:
 
-Let's start by creating the Zod schema.
+```tsx
+import { Metadata } from "next";
+import { requireAdmin } from "@/lib/auth-guard";
 
-Open the `lib/validator.ts` file. We already have an `insertProductSchema` schema. Let's create another one called `updateProductSchema` right below it.
+export const metadata: Metadata = {
+  title: "Create product",
+};
 
-```ts
-// Schema for updating a product
-export const updateProductSchema = insertProductSchema.extend({
-  id: z.string().min(1, 'Id is required'),
-});
+const CreateProductPage = async () => {
+  await requireAdmin();
+  return (
+    <>
+      <h2 className="h2-bold">Create Product</h2>
+      <div className="my-8">{/* Product Form Here */}</div>
+    </>
+  );
+};
+export default CreateProductPage;
 ```
 
-All we need to do is extend the `insertProductSchema` schema with the `id` field. We also need to add the `id` field to the `insertProductSchema` schema.
+If you go to the admin products page, you should be able to click on the button and see the heading. You can also go to the `/admin/products/create` page and see the heading.
 
-Open the `lib/actions/product.actions.ts` file and import the `updateProductSchema` schema:
+## Product Form
 
-```ts
-import { insertProductSchema, updateProductSchema } from '../validator';
+Let's start on the product form. Create a file at `components/admin/product-form.tsx` and add the following code for now:
+
+```tsx
+"use client";
+
+const ProductForm = () => {
+  return <>Form</>;
+};
+
+export default ProductForm;
 ```
 
-## Product Default Values
+Now bring it into the `app/admin/products/create/page.tsx` file:
 
-I am also going to add a constant for the product form default values. Open the `lib/constants/index.ts` file and add the following constant:
+```tsx
+import ProductForm from "@/components/admin/product-form";
+```
 
-```ts
-export const productDefaultValues = {
-  name: '',
-  slug: '',
-  category: '',
-  images: [],
-  brand: '',
-  description: '',
-  price: '0',
-  stock: 0,
-  rating: '0',
-  numReviews: '0',
-  isFeatured: false,
-  banner: null,
+and embed it:
+
+```tsx
+const CreateProductPage = () => {
+  return (
+    <>
+      <h2 className="h2-bold">Create Product</h2>
+      <div className="my-8">
+        <ProductForm type="Create" />
+      </div>
+    </>
+  );
 };
 ```
 
-## Create Product Action
+We are passing in a type of `Create` to the form. This can be either `Create` or `Update`.
 
-Let's create the action to create a product. In the `lib/actions/product.actions.ts` file and add the following function:
+You should see the text `Form` on the page.
 
-```ts
-// Create Product
-export async function createProduct(data: z.infer<typeof insertProductSchema>) {
-  try {
-    // Validate and create product
-    const product = insertProductSchema.parse(data);
-    await prisma.product.create({ data: product });
+Let's add all of the imports:
 
-    revalidatePath('/admin/products');
-
-    return {
-      success: true,
-      message: 'Product created successfully',
-    };
-  } catch (error) {
-    return { success: false, message: formatError(error) };
-  }
-}
+```tsx
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { createProduct, updateProduct } from "@/lib/actions/product.actions";
+import { productDefaultValues } from "@/lib/constants";
+import { insertProductSchema, updateProductSchema } from "@/lib/validator";
+import { ControllerRenderProps } from "react-hook-form";
+import { Product } from "@/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import slugify from "slugify";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Card, CardContent } from "@/components/ui/card";
+import Image from "next/image";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 ```
 
-This code is simple. We are validating the product using the `insertProductSchema` schema. If the validation is successful, we are creating the product using the Prisma client. We are also revalidating the `/admin/products` page to update the products list.
+Lot's of imports here. We have a bunch of ui components from ShadCN, a few hooks, a few actions, a few types, a few constants, a few validators, a few libraries, and a few components.
 
-## Update Product Action
+Let's add a few parameters to the `ProductForm` component and also init the router and toast:
 
-While we're in the action file, let's also add the update product action.
+```tsx
+const ProductForm = ({
+  type,
+  product,
+  productId,
+}: {
+  type: "Create" | "Update";
+  product?: Product;
+  productId?: string;
+}) => {
+  const router = useRouter();
+  const { toast } = useToast();
 
-Add the following function to the `lib/actions/product.actions.ts` file:
-
-```ts
-// Update Product
-export async function updateProduct(data: z.infer<typeof updateProductSchema>) {
-  try {
-    // Validate and find product
-    const product = updateProductSchema.parse(data);
-    const productExists = await prisma.product.findFirst({
-      where: { id: product.id },
-    });
-
-    if (!productExists) throw new Error('Product not found');
-
-    // Update product
-    await prisma.product.update({ where: { id: product.id }, data: product });
-
-    revalidatePath('/admin/products');
-
-    return {
-      success: true,
-      message: 'Product updated successfully',
-    };
-  } catch (error) {
-    return { success: false, message: formatError(error) };
-  }
-}
+  return <>Form</>;
+};
 ```
 
-We are finding, validating and updating the product using the Prisma client. We are also revalidating the `/admin/products` page to update the products list.
+It is taking in a type, which will be either `Create` or `Update`, a product, and a productId. We will use this to determine whether we are creating a new product or updating an existing product.
 
-Now that we have the actions, let's start to work on the pages and forms.
+We are going to use React Hook Form, so let's create a form:
+
+```tsx
+const form = useForm<z.infer<typeof insertProductSchema>>({
+  resolver: type === "Update" ? zodResolver(updateProductSchema) : zodResolver(insertProductSchema),
+  defaultValues: product && type === "Update" ? product : productDefaultValues,
+});
+```
+
+We are using the `useForm` hook from React Hook Form. We are passing in the schema we want to use, the default values, and the resolver. We are using the `zodResolver` from `@hookform/resolvers/zod` to resolve the schema. We are using the `type` parameter to determine whether we are creating a new product or updating an existing product. We are using the `product` parameter to determine the default values. We are using the `productId` parameter to determine whether we are creating a new product or updating an existing product.
+
+Now we want to assemble the form with a bunch of fields. These are the fields we want to show in the form:
+
+- Name
+- Slug (with a button to generate the slug from the name)
+- Category
+- Brand
+- Price
+- Stock
+- Images (We will add this later)
+- Featured (Is the image featured?) (We will add this later)
+- Description
+- Button to submit the form
+
+It will be a two colum layout. So we will have a div wrapped around every two fields.
+
+Let's add the form to the return statement with the divs that will hold the fields. We will use comments to map everything out:
+
+```tsx
+return (
+  <Form {...form}>
+    <form className="space-y-8">
+      <div className="flex flex-col gap-5 md:flex-row">
+        {/* Name */}
+        {/* Slug */}
+      </div>
+      <div className="flex flex-col gap-5 md:flex-row">
+        {/* Category */}
+        {/* Brand */}
+      </div>
+      <div className="flex flex-col gap-5 md:flex-row">
+        {/* Price */}
+        {/* Stock  */}
+      </div>
+      <div className="upload-field flex flex-col gap-5 md:flex-row">{/* Images */}</div>
+      <div className="upload-field">{/* Is Featured */}</div>
+      <div>{/* Description */}</div>
+      <div>{/* Submit */}</div>
+    </form>
+  </Form>
+);
+```
+
+I added the custom class `upload-field` to the divs that will hold image uploads because for some reason the button text is white on the white background. So we will add an override class to the button to make it black.
+
+In the next lesson, we will add the form fields.
