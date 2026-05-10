@@ -2,175 +2,216 @@
 
 Now let's work on the page and UI to create a new product.
 
-Create a file at `app/admin/products/create/page.tsx` with the following code:
+## Slugify
 
-```tsx
-import { Metadata } from "next";
-import { requireAdmin } from "@/lib/auth-guard";
+We are going to have slugs for the product which are a URL-friendly version of the product name. We're going to use a package called `slugify` that will convert names to slugs.
 
-export const metadata: Metadata = {
-  title: "Create product",
-};
+Install the package with the following command:
 
-const CreateProductPage = async () => {
-  await requireAdmin();
-  return (
-    <>
-      <h2 className="h2-bold">Create Product</h2>
-      <div className="my-8">{/* Product Form Here */}</div>
-    </>
-  );
-};
-export default CreateProductPage;
+```bash
+npm install slugify
 ```
 
-If you go to the admin products page, you should be able to click on the button and see the heading. You can also go to the `/admin/products/create` page and see the heading.
+## Name & Slug Fields
 
-## Product Form
-
-Let's start on the product form. Create a file at `components/admin/product-form.tsx` and add the following code for now:
+In the first div, we will have the name and the slug:
 
 ```tsx
-"use client";
-
-const ProductForm = () => {
-  return <>Form</>;
-};
-
-export default ProductForm;
+<div className="flex flex-col gap-5 md:flex-row">
+  {/* Name */}
+  <FormField
+    control={form.control}
+    name="name"
+    render={({
+      field,
+    }: {
+      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "name">;
+    }) => (
+      <FormItem className="w-full">
+        <FormLabel>Name</FormLabel>
+        <FormControl>
+          <Input placeholder="Enter product name" {...field} />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+  {/* Slug */}
+  <FormField
+    control={form.control}
+    name="slug"
+    render={({
+      field,
+    }: {
+      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "slug">;
+    }) => (
+      <FormItem className="w-full">
+        <FormLabel>Slug</FormLabel>
+        <FormControl>
+          <div className="relative">
+            <Input placeholder="Enter product slug" className="pl-8" {...field} />
+            {/* Generate Button */}
+          </div>
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</div>
 ```
 
-Now bring it into the `app/admin/products/create/page.tsx` file:
+Let's add the button to generate the slug:
 
 ```tsx
-import ProductForm from "@/components/admin/product-form";
+<button
+  type="button"
+  className="bg-gray-500 text-white px-4 py-1 mt-2 hover:bg-gray-600"
+  onClick={() => {
+    form.setValue("slug", slugify(form.getValues("name"), { lower: true }));
+  }}
+>
+  Generate
+</button>
 ```
 
-and embed it:
+We are using the `slugify` library to generate the slug from the name. We are using the `form.getValues` method to get the value of the name field. We are using the `form.setValue` method to set the value of the slug field.
+
+## Category & Brand Fields
+
+Lat's add the next set of fields:
 
 ```tsx
-const CreateProductPage = () => {
-  return (
-    <>
-      <h2 className="h2-bold">Create Product</h2>
-      <div className="my-8">
-        <ProductForm type="Create" />
-      </div>
-    </>
-  );
-};
+<div className="flex flex-col gap-5 md:flex-row">
+  {/* Category */}
+  <FormField
+    control={form.control}
+    name="category"
+    render={({
+      field,
+    }: {
+      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "category">;
+    }) => (
+      <FormItem className="w-full">
+        <FormLabel>Category</FormLabel>
+        <FormControl>
+          <Input placeholder="Enter category" {...field} />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+  {/* Brand */}
+  <FormField
+    control={form.control}
+    name="brand"
+    render={({
+      field,
+    }: {
+      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "brand">;
+    }) => (
+      <FormItem className="w-full">
+        <FormLabel>Brand</FormLabel>
+        <FormControl>
+          <Input placeholder="Enter product brand" {...field} />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</div>
 ```
 
-We are passing in a type of `Create` to the form. This can be either `Create` or `Update`.
+## Price & Stock Fields
 
-You should see the text `Form` on the page.
-
-Let's add all of the imports:
+Now, let's add the price and stock fields:
 
 ```tsx
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { createProduct, updateProduct } from "@/lib/actions/product.actions";
-import { productDefaultValues } from "@/lib/constants";
-import { insertProductSchema, updateProductSchema } from "@/lib/validator";
-import { ControllerRenderProps } from "react-hook-form";
-import { Product } from "@/types";
-import { zodResolver } from "@hookform/resolvers/zod";
-import slugify from "slugify";
-import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { Card, CardContent } from "@/components/ui/card";
-import Image from "next/image";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+<div className="flex flex-col gap-5 md:flex-row">
+  {/* Price */}
+  <FormField
+    control={form.control}
+    name="price"
+    render={({
+      field,
+    }: {
+      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "price">;
+    }) => (
+      <FormItem className="w-full">
+        <FormLabel>Price</FormLabel>
+        <FormControl>
+          <Input placeholder="Enter product price" {...field} />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+  {/* Stock */}
+  <FormField
+    control={form.control}
+    name="stock"
+    render={({
+      field,
+    }: {
+      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "stock">;
+    }) => (
+      <FormItem className="w-full">
+        <FormLabel>Stock</FormLabel>
+        <FormControl>
+          <Input type="number" placeholder="Enter product stock" {...field} />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</div>
 ```
 
-Lot's of imports here. We have a bunch of ui components from ShadCN, a few hooks, a few actions, a few types, a few constants, a few validators, a few libraries, and a few components.
+## Description Field
 
-Let's add a few parameters to the `ProductForm` component and also init the router and toast:
+We are going to skip the image field for now and add the description and the submit button.
+
+We need to install the ShadCN Textarea component. In your terminal, enter the following command:
+
+```bash
+npx shadcn@latest add textarea
+```
+
+Add the following for the description:
 
 ```tsx
-const ProductForm = ({
-  type,
-  product,
-  productId,
-}: {
-  type: "Create" | "Update";
-  product?: Product;
-  productId?: string;
-}) => {
-  const router = useRouter();
-  const { toast } = useToast();
-
-  return <>Form</>;
-};
+<div>
+  {/* Description */}
+  <FormField
+    control={form.control}
+    name="description"
+    render={({
+      field,
+    }: {
+      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "description">;
+    }) => (
+      <FormItem className="w-full">
+        <FormLabel>Description</FormLabel>
+        <FormControl>
+          <Textarea placeholder="Enter product description" className="resize-none" {...field} />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</div>
 ```
 
-It is taking in a type, which will be either `Create` or `Update`, a product, and a productId. We will use this to determine whether we are creating a new product or updating an existing product.
-
-We are going to use React Hook Form, so let's create a form:
+Now add the submit button:
 
 ```tsx
-const form = useForm<z.infer<typeof insertProductSchema>>({
-  resolver: type === "Update" ? zodResolver(updateProductSchema) : zodResolver(insertProductSchema),
-  defaultValues: product && type === "Update" ? product : productDefaultValues,
-});
+<Button
+  type="submit"
+  size="lg"
+  disabled={form.formState.isSubmitting}
+  className="button col-span-2 w-full"
+>
+  {form.formState.isSubmitting ? "Submitting" : `${type} Product`}
+</Button>
 ```
 
-We are using the `useForm` hook from React Hook Form. We are passing in the schema we want to use, the default values, and the resolver. We are using the `zodResolver` from `@hookform/resolvers/zod` to resolve the schema. We are using the `type` parameter to determine whether we are creating a new product or updating an existing product. We are using the `product` parameter to determine the default values. We are using the `productId` parameter to determine whether we are creating a new product or updating an existing product.
-
-Now we want to assemble the form with a bunch of fields. These are the fields we want to show in the form:
-
-- Name
-- Slug (with a button to generate the slug from the name)
-- Category
-- Brand
-- Price
-- Stock
-- Images (We will add this later)
-- Featured (Is the image featured?) (We will add this later)
-- Description
-- Button to submit the form
-
-It will be a two colum layout. So we will have a div wrapped around every two fields.
-
-Let's add the form to the return statement with the divs that will hold the fields. We will use comments to map everything out:
-
-```tsx
-return (
-  <Form {...form}>
-    <form className="space-y-8">
-      <div className="flex flex-col gap-5 md:flex-row">
-        {/* Name */}
-        {/* Slug */}
-      </div>
-      <div className="flex flex-col gap-5 md:flex-row">
-        {/* Category */}
-        {/* Brand */}
-      </div>
-      <div className="flex flex-col gap-5 md:flex-row">
-        {/* Price */}
-        {/* Stock  */}
-      </div>
-      <div className="upload-field flex flex-col gap-5 md:flex-row">{/* Images */}</div>
-      <div className="upload-field">{/* Is Featured */}</div>
-      <div>{/* Description */}</div>
-      <div>{/* Submit */}</div>
-    </form>
-  </Form>
-);
-```
-
-I added the custom class `upload-field` to the divs that will hold image uploads because for some reason the button text is white on the white background. So we will add an override class to the button to make it black.
-
-In the next lesson, we will add the form fields.
+Alright, now that we added the form fields, in the next lesson, we will add the submit handler.
