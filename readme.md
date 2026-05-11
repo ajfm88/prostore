@@ -1,217 +1,81 @@
-# Create Product Page
+# Create Product Handler
 
-Now let's work on the page and UI to create a new product.
+We have most of our product form ready. We do still need the images and the is featured field, but we will get to those later.
 
-## Slugify
-
-We are going to have slugs for the product which are a URL-friendly version of the product name. We're going to use a package called `slugify` that will convert names to slugs.
-
-Install the package with the following command:
-
-```bash
-npm install slugify
-```
-
-## Name & Slug Fields
-
-In the first div, we will have the name and the slug:
+Let's create the handler for the create product form. In the `components/admin/product-form.tsx` file, add the following code above the `return` statement:
 
 ```tsx
-<div className="flex flex-col gap-5 md:flex-row">
-  {/* Name */}
-  <FormField
-    control={form.control}
-    name="name"
-    render={({
-      field,
-    }: {
-      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "name">;
-    }) => (
-      <FormItem className="w-full">
-        <FormLabel>Name</FormLabel>
-        <FormControl>
-          <Input placeholder="Enter product name" {...field} />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-  {/* Slug */}
-  <FormField
-    control={form.control}
-    name="slug"
-    render={({
-      field,
-    }: {
-      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "slug">;
-    }) => (
-      <FormItem className="w-full">
-        <FormLabel>Slug</FormLabel>
-        <FormControl>
-          <div className="relative">
-            <Input placeholder="Enter product slug" className="pl-8" {...field} />
-            {/* Generate Button */}
-          </div>
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-</div>
+// Handle form submit
+const onSubmit: SubmitHandler<z.infer<typeof insertProductSchema>> = async (values) => {
+  if (type === "Create") {
+    const res = await createProduct(values);
+
+    if (!res.success) {
+      toast({
+        variant: "destructive",
+        description: res.message,
+      });
+    } else {
+      toast({
+        description: res.message,
+      });
+      router.push(`/admin/products`);
+    }
+  }
+  if (type === "Update") {
+    if (!productId) {
+      router.push(`/admin/products`);
+      return;
+    }
+
+    const res = await updateProduct({ ...values, id: productId });
+
+    if (!res.success) {
+      toast({
+        variant: "destructive",
+        description: res.message,
+      });
+    } else {
+      router.push(`/admin/products`);
+    }
+  }
+};
 ```
 
-Let's add the button to generate the slug:
+We are just calling the appropriate action based on the type and the productId. We are also using the router to navigate to the admin products page after the product is created or updated.
+
+Add the handler to the form:
 
 ```tsx
-<button
-  type="button"
-  className="bg-gray-500 text-white px-4 py-1 mt-2 hover:bg-gray-600"
-  onClick={() => {
-    form.setValue("slug", slugify(form.getValues("name"), { lower: true }));
-  }}
+<form
+  method='post'
+  onSubmit={form.handleSubmit(onSubmit)}
+  className='space-y-8'
 >
-  Generate
-</button>
 ```
 
-We are using the `slugify` library to generate the slug from the name. We are using the `form.getValues` method to get the value of the name field. We are using the `form.setValue` method to set the value of the slug field.
+If you try and submit the form with nothing filled in, you will see all your error messages.
 
-## Category & Brand Fields
+If you fill them all in you'll notice it is not submitting. This is because the `insertProductSchema` schema need the images, banner and isFeatured fields to be set.
 
-Lat's add the next set of fields:
+Since we are not using those fields yet, Let's open the `lib/validator.ts` file and comment out the following lines:
 
-```tsx
-<div className="flex flex-col gap-5 md:flex-row">
-  {/* Category */}
-  <FormField
-    control={form.control}
-    name="category"
-    render={({
-      field,
-    }: {
-      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "category">;
-    }) => (
-      <FormItem className="w-full">
-        <FormLabel>Category</FormLabel>
-        <FormControl>
-          <Input placeholder="Enter category" {...field} />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-  {/* Brand */}
-  <FormField
-    control={form.control}
-    name="brand"
-    render={({
-      field,
-    }: {
-      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "brand">;
-    }) => (
-      <FormItem className="w-full">
-        <FormLabel>Brand</FormLabel>
-        <FormControl>
-          <Input placeholder="Enter product brand" {...field} />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-</div>
+```ts
+// Schema for inserting a product
+export const insertProductSchema = z.object({
+  name: z.string().min(3, "Name must be at least 3 characters"),
+  slug: z.string().min(3, "Name must be at least 3 characters"),
+  category: z.string().min(3, "Name must be at least 3 characters"),
+  brand: z.string().min(3, "Name must be at least 3 characters"),
+  description: z.string().min(3, "Name must be at least 3 characters"),
+  stock: z.coerce.number(),
+  // images: z.array(z.string()).min(1, 'Product must have at least one image'),
+  // isFeatured: z.boolean(),
+  // banner: z.string().nullable(),
+  price: currency,
+});
 ```
 
-## Price & Stock Fields
+Now if you try and submit the form, it should work.
 
-Now, let's add the price and stock fields:
-
-```tsx
-<div className="flex flex-col gap-5 md:flex-row">
-  {/* Price */}
-  <FormField
-    control={form.control}
-    name="price"
-    render={({
-      field,
-    }: {
-      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "price">;
-    }) => (
-      <FormItem className="w-full">
-        <FormLabel>Price</FormLabel>
-        <FormControl>
-          <Input placeholder="Enter product price" {...field} />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-  {/* Stock */}
-  <FormField
-    control={form.control}
-    name="stock"
-    render={({
-      field,
-    }: {
-      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "stock">;
-    }) => (
-      <FormItem className="w-full">
-        <FormLabel>Stock</FormLabel>
-        <FormControl>
-          <Input type="number" placeholder="Enter product stock" {...field} />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-</div>
-```
-
-## Description Field
-
-We are going to skip the image field for now and add the description and the submit button.
-
-We need to install the ShadCN Textarea component. In your terminal, enter the following command:
-
-```bash
-npx shadcn@latest add textarea
-```
-
-Add the following for the description:
-
-```tsx
-<div>
-  {/* Description */}
-  <FormField
-    control={form.control}
-    name="description"
-    render={({
-      field,
-    }: {
-      field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "description">;
-    }) => (
-      <FormItem className="w-full">
-        <FormLabel>Description</FormLabel>
-        <FormControl>
-          <Textarea placeholder="Enter product description" className="resize-none" {...field} />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-</div>
-```
-
-Now add the submit button:
-
-```tsx
-<Button
-  type="submit"
-  size="lg"
-  disabled={form.formState.isSubmitting}
-  className="button col-span-2 w-full"
->
-  {form.formState.isSubmitting ? "Submitting" : `${type} Product`}
-</Button>
-```
-
-Alright, now that we added the form fields, in the next lesson, we will add the submit handler.
+You will see the product in the admin products area and on the home page. It will not have an image yet. Let's fix that next.

@@ -24,6 +24,7 @@ import Image from "next/image";
 //import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { SubmitHandler } from "react-hook-form";
 
 const ProductForm = ({
   type,
@@ -44,9 +45,45 @@ const ProductForm = ({
     defaultValues: product && type === "Update" ? product : productDefaultValues,
   });
 
+  // Handle form submit
+  const onSubmit: SubmitHandler<z.infer<typeof insertProductSchema>> = async (values) => {
+    if (type === "Create") {
+      const res = await createProduct(values);
+
+      if (!res.success) {
+        toast({
+          variant: "destructive",
+          description: res.message,
+        });
+      } else {
+        toast({
+          description: res.message,
+        });
+        router.push(`/admin/products`);
+      }
+    }
+    if (type === "Update") {
+      if (!productId) {
+        router.push(`/admin/products`);
+        return;
+      }
+
+      const res = await updateProduct({ ...values, id: productId });
+
+      if (!res.success) {
+        toast({
+          variant: "destructive",
+          description: res.message,
+        });
+      } else {
+        router.push(`/admin/products`);
+      }
+    }
+  };
+
   return (
     <Form {...form}>
-      <form className="space-y-8">
+      <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <div className="flex flex-col gap-5 md:flex-row">
           {/* Name */}
           <FormField
