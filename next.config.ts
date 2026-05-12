@@ -17,6 +17,15 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "utfs.io",
+        port: "",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

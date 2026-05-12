@@ -1,81 +1,104 @@
-# Create Product Handler
+# Image Upload
 
-We have most of our product form ready. We do still need the images and the is featured field, but we will get to those later.
+We are going to use the `uploadthing` library to handle the image uploading. Uploadthing is a file uploading service that offers features like middleware support, file type validation, and custom metadata, making it an great choice for secure and efficient file handling. The free teir that we're using is very generous and the paid teir is only 10 bucks per month. They aren't sponsoring or anything like that. I just think it's a good solution for image uploads.
 
-Let's create the handler for the create product form. In the `components/admin/product-form.tsx` file, add the following code above the `return` statement:
+Go to https://uploadthing.com/ and sign in with Github. Then click on the "Create an app" button and name your app. Then from the dashboard, click on the "API Keys" option and copy the token, secret and the app id (Find this in the URL) and past them in your `.env` file.
 
-```tsx
-// Handle form submit
-const onSubmit: SubmitHandler<z.infer<typeof insertProductSchema>> = async (values) => {
-  if (type === "Create") {
-    const res = await createProduct(values);
+They should look something like this:
 
-    if (!res.success) {
-      toast({
-        variant: "destructive",
-        description: res.message,
-      });
-    } else {
-      toast({
-        description: res.message,
-      });
-      router.push(`/admin/products`);
-    }
-  }
-  if (type === "Update") {
-    if (!productId) {
-      router.push(`/admin/products`);
-      return;
-    }
-
-    const res = await updateProduct({ ...values, id: productId });
-
-    if (!res.success) {
-      toast({
-        variant: "destructive",
-        description: res.message,
-      });
-    } else {
-      router.push(`/admin/products`);
-    }
-  }
-};
+```
+UPLOADTHING_TOKEN='ur key';
+UPLOADTHING_SECRET='ur key'
+UPLOADTHING_APPID='ur key'
 ```
 
-We are just calling the appropriate action based on the type and the productId. We are also using the router to navigate to the admin products page after the product is created or updated.
+We need to install the following packages:
 
-Add the handler to the form:
-
-```tsx
-<form
-  method='post'
-  onSubmit={form.handleSubmit(onSubmit)}
-  className='space-y-8'
->
+```bash
+npm install uploadthing @uploadthing/react
 ```
 
-If you try and submit the form with nothing filled in, you will see all your error messages.
+All the code that we are about to write comes from the [uploadthing documentation](https://docs.uploadthing.com/getting-started/appdir).
 
-If you fill them all in you'll notice it is not submitting. This is because the `insertProductSchema` schema need the images, banner and isFeatured fields to be set.
-
-Since we are not using those fields yet, Let's open the `lib/validator.ts` file and comment out the following lines:
+We need to create a new file at `app/api/uploadthing/core.ts` and add the following code:
 
 ```ts
-// Schema for inserting a product
-export const insertProductSchema = z.object({
-  name: z.string().min(3, "Name must be at least 3 characters"),
-  slug: z.string().min(3, "Name must be at least 3 characters"),
-  category: z.string().min(3, "Name must be at least 3 characters"),
-  brand: z.string().min(3, "Name must be at least 3 characters"),
-  description: z.string().min(3, "Name must be at least 3 characters"),
-  stock: z.coerce.number(),
-  // images: z.array(z.string()).min(1, 'Product must have at least one image'),
-  // isFeatured: z.boolean(),
-  // banner: z.string().nullable(),
-  price: currency,
+import { createUploadthing, type FileRouter } from "uploadthing/next";
+import { UploadThingError } from "uploadthing/server";
+import { auth } from "@/auth";
+
+const f = createUploadthing();
+
+export const ourFileRouter = {
+  imageUploader: f({ image: { maxFileSize: "4MB" } })
+    .middleware(async () => {
+      const session = await auth();
+
+      if (!session) throw new UploadThingError("Unauthorized");
+
+      return { userId: session?.user.id };
+    })
+    .onUploadComplete(async ({ metadata }) => {
+      return { uploadedBy: metadata.userId };
+    }),
+} satisfies FileRouter;
+
+export type OurFileRouter = typeof ourFileRouter;
+```
+
+This code creates a file router for the uploadthing library. It also creates a middleware that checks if the user is authenticated. If the user is not authenticated, it throws an error. It also returns the user id in the metadata. This metadata is then passed to the `onUploadComplete` callback.
+
+## Create The Route
+
+Now we will use the `ourFileRouter` to create a route for the uploadthing library. Create a file at `app/api/uploadthing/route.ts` with the following code:
+
+```ts
+import { createRouteHandler } from "uploadthing/next";
+import { ourFileRouter } from "./core";
+
+// Export routes for Next App Router
+export const { GET, POST } = createRouteHandler({
+  router: ourFileRouter,
 });
 ```
 
-Now if you try and submit the form, it should work.
+We are exporting the `GET` and `POST` routes for the uploadthing library. This works similar to how we created the routes for the next auth library. So the route /api/uploadthing will be used to upload images.
 
-You will see the product in the admin products area and on the home page. It will not have an image yet. Let's fix that next.
+## Generate Components
+
+Now we are going to generate some pre-configured components that we can use to upload images.
+
+Create a file named `lib/uploadthing.ts` with the following code:
+
+```ts
+import { generateUploadButton, generateUploadDropzone } from "@uploadthing/react";
+import type { OurFileRouter } from "@/app/api/uploadthing/core";
+
+export const UploadButton = generateUploadButton<OurFileRouter>();
+export const UploadDropzone = generateUploadDropzone<OurFileRouter>();
+```
+
+We are exporting the `UploadButton` and `UploadDropzone` components from the `uploadthing` library with the `OurFileRouter` type. You can import them directly in the file where you want to use them.
+
+## Add Domain To Config
+
+When we use images from 3rd party websites, we need to add the domain to the `next.config.mjs` file.
+
+Add the following code to the `next.config.mjs` file:
+
+```js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "utfs.io",
+        port: "",
+      },
+    ],
+  },
+};
+
+export default nextConfig;
+```
