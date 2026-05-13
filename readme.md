@@ -1,104 +1,103 @@
-# Image Upload
+# Add Image Uploads
 
-We are going to use the `uploadthing` library to handle the image uploading. Uploadthing is a file uploading service that offers features like middleware support, file type validation, and custom metadata, making it an great choice for secure and efficient file handling. The free teir that we're using is very generous and the paid teir is only 10 bucks per month. They aren't sponsoring or anything like that. I just think it's a good solution for image uploads.
+A couple lessons ago, we commented out some fields in the `lib/validators.ts` file in the `insertProductSchema`. We want to uncomment the `images` field so that we can upload images to our products.
 
-Go to https://uploadthing.com/ and sign in with Github. Then click on the "Create an app" button and name your app. Then from the dashboard, click on the "API Keys" option and copy the token, secret and the app id (Find this in the URL) and past them in your `.env` file.
-
-They should look something like this:
-
-```
-UPLOADTHING_TOKEN='ur key';
-UPLOADTHING_SECRET='ur key'
-UPLOADTHING_APPID='ur key'
-```
-
-We need to install the following packages:
-
-```bash
-npm install uploadthing @uploadthing/react
-```
-
-All the code that we are about to write comes from the [uploadthing documentation](https://docs.uploadthing.com/getting-started/appdir).
-
-We need to create a new file at `app/api/uploadthing/core.ts` and add the following code:
+So it should look like this:
 
 ```ts
-import { createUploadthing, type FileRouter } from "uploadthing/next";
-import { UploadThingError } from "uploadthing/server";
-import { auth } from "@/auth";
-
-const f = createUploadthing();
-
-export const ourFileRouter = {
-  imageUploader: f({ image: { maxFileSize: "4MB" } })
-    .middleware(async () => {
-      const session = await auth();
-
-      if (!session) throw new UploadThingError("Unauthorized");
-
-      return { userId: session?.user.id };
-    })
-    .onUploadComplete(async ({ metadata }) => {
-      return { uploadedBy: metadata.userId };
-    }),
-} satisfies FileRouter;
-
-export type OurFileRouter = typeof ourFileRouter;
-```
-
-This code creates a file router for the uploadthing library. It also creates a middleware that checks if the user is authenticated. If the user is not authenticated, it throws an error. It also returns the user id in the metadata. This metadata is then passed to the `onUploadComplete` callback.
-
-## Create The Route
-
-Now we will use the `ourFileRouter` to create a route for the uploadthing library. Create a file at `app/api/uploadthing/route.ts` with the following code:
-
-```ts
-import { createRouteHandler } from "uploadthing/next";
-import { ourFileRouter } from "./core";
-
-// Export routes for Next App Router
-export const { GET, POST } = createRouteHandler({
-  router: ourFileRouter,
+// Schema for inserting a product
+export const insertProductSchema = z.object({
+  name: z.string().min(3, 'Name must be at least 3 characters'),
+  slug: z.string().min(3, 'Name must be at least 3 characters'),
+  category: z.string().min(3, 'Name must be at least 3 characters'),
+  brand: z.string().min(3, 'Name must be at least 3 characters'),
+  description: z.string().min(3, 'Name must be at least 3 characters'),
+  stock: z.coerce.number(),
+  images: z.array(z.string()).min(1, 'Product must have at least one image'),
+  // isFeatured: z.boolean(),
+  // banner: z.string().nullable(),
+  price: currency,
 });
 ```
 
-We are exporting the `GET` and `POST` routes for the uploadthing library. This works similar to how we created the routes for the next auth library. So the route /api/uploadthing will be used to upload images.
+Now let's open the `components/shared/admin/product-form.tsx` file and add the image field. We also want to preview the image.
 
-## Generate Components
+Import the `UploadButton` component from the file we created earlier:
 
-Now we are going to generate some pre-configured components that we can use to upload images.
-
-Create a file named `lib/uploadthing.ts` with the following code:
-
-```ts
-import { generateUploadButton, generateUploadDropzone } from "@uploadthing/react";
-import type { OurFileRouter } from "@/app/api/uploadthing/core";
-
-export const UploadButton = generateUploadButton<OurFileRouter>();
-export const UploadDropzone = generateUploadDropzone<OurFileRouter>();
+```tsx
+import { UploadButton } from '@/lib/uploadthing';
 ```
 
-We are exporting the `UploadButton` and `UploadDropzone` components from the `uploadthing` library with the `OurFileRouter` type. You can import them directly in the file where you want to use them.
+Right above the return statement, add the following:
 
-## Add Domain To Config
-
-When we use images from 3rd party websites, we need to add the domain to the `next.config.mjs` file.
-
-Add the following code to the `next.config.mjs` file:
-
-```js
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "utfs.io",
-        port: "",
-      },
-    ],
-  },
-};
-
-export default nextConfig;
+```tsx
+const images = form.watch('images');
 ```
+
+This will allow us to access the images array from the form.
+
+Replace the image comment in the return statement with the following:
+
+```tsx
+<FormField
+  control={form.control}
+  name='images'
+  render={() => (
+    <FormItem className='w-full'>
+      <FormLabel>Images</FormLabel>
+      <Card>
+        <CardContent className='space-y-2 mt-2 min-h-48'>
+          <div className='flex-start space-x-2'>
+            {images.map((image: string) => (
+              <Image
+                key={image}
+                src={image}
+                alt='product image'
+                className='w-20 h-20 object-cover object-center rounded-sm'
+                width={100}
+                height={100}
+              />
+            ))}
+            <FormControl>
+              <UploadButton
+                endpoint='imageUploader'
+                onClientUploadComplete={(res: { url: string }[]) => {
+                  form.setValue('images', [...images, res[0].url]);
+                }}
+                onUploadError={(error: Error) => {
+                  toast({
+                    variant: 'destructive',
+                    description: `ERROR! ${error.message}`,
+                  });
+                }}
+              />
+            </FormControl>
+          </div>
+        </CardContent>
+      </Card>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+```
+
+We created an area for the uploaded images to be displayed. We map over the images and display them. We also added a button to upload images using the `UploadButton` component. We also added a `onClientUploadComplete` function that will be called when the upload is complete. When the upload is complete, we will add the new image to the images array to be sent to the database. On error, we will show a toast message.
+
+You may notice that you can't see the "Choose File" text. This is why I added the custom class of `upload-field` to the div.
+
+Open your `assets/styles/globals.css` file and add the following:
+
+```css
+/* Uploadthing button text override*/
+html.dark .upload-field .text-white {
+  color: #ffffff !important;
+}
+
+.upload-field .text-white {
+  color: #000 !important;
+}
+```
+
+That should fix the issue.
+
+Now try adding a new product and uploading an image. You should see the image in the preview area.
