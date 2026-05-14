@@ -1,103 +1,63 @@
-# Add Image Uploads
+# Product Cleanup
 
-A couple lessons ago, we commented out some fields in the `lib/validators.ts` file in the `insertProductSchema`. We want to uncomment the `images` field so that we can upload images to our products.
+Right now, our sample products are still using a local path to the image. We need to change that to a public path. So we are going to delete all existing products and re-add them.
 
-So it should look like this:
+I am attaching the images for the products in this lesson. But you can also just get them from your `public/images/sample-products` folder.
 
-```ts
-// Schema for inserting a product
-export const insertProductSchema = z.object({
-  name: z.string().min(3, 'Name must be at least 3 characters'),
-  slug: z.string().min(3, 'Name must be at least 3 characters'),
-  category: z.string().min(3, 'Name must be at least 3 characters'),
-  brand: z.string().min(3, 'Name must be at least 3 characters'),
-  description: z.string().min(3, 'Name must be at least 3 characters'),
-  stock: z.coerce.number(),
-  images: z.array(z.string()).min(1, 'Product must have at least one image'),
-  // isFeatured: z.boolean(),
-  // banner: z.string().nullable(),
-  price: currency,
-});
-```
+Here are the products to add right now. We are not going to add one and two just yet because I want them to be featured and we don't have that option yet.
 
-Now let's open the `components/shared/admin/product-form.tsx` file and add the image field. We also want to preview the image.
+- name: Polo Sporting Stretch Shirt
+- category: Mens Dress Shirts
+- description: Classic Polo style with modern comfort
+- price: 59.99
+- brand: Polo
+- stock: 500
 
-Import the `UploadButton` component from the file we created earlier:
+Upload the images `p1-1.jpg` and `p1-2.jpg`.
 
-```tsx
-import { UploadButton } from '@/lib/uploadthing';
-```
+- name: Brooks Brothers Long Sleeved Shirt
+- category: Mens Dress Shirts
+- description: Timeless style and premium comfort
+- price: 85.99
+- brand: Brooks Brothers
+- stock: 500
 
-Right above the return statement, add the following:
+Upload the images `p2-1.jpg` and `p2-2.jpg`.
 
-```tsx
-const images = form.watch('images');
-```
+- name: Tommy Hilfiger Classic Fit Dress Shirt
+- category: Mens Dress Shirts
+- description: A perfect blend of sophistication and comfort
+- price: 99.95
+- brand: Tommy Hilfiger
+- stock: 500
 
-This will allow us to access the images array from the form.
+Upload the images `p3-1.jpg` and `p3-2.jpg`.
 
-Replace the image comment in the return statement with the following:
+- name: Calvin Klein Slim Fit Stretch Shirt
+- category: Mens Dress Shirts
+- description: Streamlined design with flexible stretch fabric
+- price: 99.95
+- brand: Calvin Klein
+- stock: 500
 
-```tsx
-<FormField
-  control={form.control}
-  name='images'
-  render={() => (
-    <FormItem className='w-full'>
-      <FormLabel>Images</FormLabel>
-      <Card>
-        <CardContent className='space-y-2 mt-2 min-h-48'>
-          <div className='flex-start space-x-2'>
-            {images.map((image: string) => (
-              <Image
-                key={image}
-                src={image}
-                alt='product image'
-                className='w-20 h-20 object-cover object-center rounded-sm'
-                width={100}
-                height={100}
-              />
-            ))}
-            <FormControl>
-              <UploadButton
-                endpoint='imageUploader'
-                onClientUploadComplete={(res: { url: string }[]) => {
-                  form.setValue('images', [...images, res[0].url]);
-                }}
-                onUploadError={(error: Error) => {
-                  toast({
-                    variant: 'destructive',
-                    description: `ERROR! ${error.message}`,
-                  });
-                }}
-              />
-            </FormControl>
-          </div>
-        </CardContent>
-      </Card>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
-```
+Upload the images `p4-1.jpg` and `p4-2.jpg`.
 
-We created an area for the uploaded images to be displayed. We map over the images and display them. We also added a button to upload images using the `UploadButton` component. We also added a `onClientUploadComplete` function that will be called when the upload is complete. When the upload is complete, we will add the new image to the images array to be sent to the database. On error, we will show a toast message.
+- name: Polo Ralph Lauren Oxford Shirt
+- category: Mens Dress Shirts
+- description: Iconic Polo design with refined oxford fabric
+- price: 79.99
+- brand: Polo
+- stock: 0
 
-You may notice that you can't see the "Choose File" text. This is why I added the custom class of `upload-field` to the div.
+Upload the images `p5-1.jpg` and `p5-2.jpg`.
 
-Open your `assets/styles/globals.css` file and add the following:
+- name: Polo Classic Pink Hoodie
+- category: Mens Sweatshirts
+- description: Soft, stylish, and perfect for laid-back days
+- price: 99.99
+- brand: Polo
+- stock: 500
 
-```css
-/* Uploadthing button text override*/
-html.dark .upload-field .text-white {
-  color: #ffffff !important;
-}
+Upload the images `p6-1.jpg` and `p6-2.jpg`.
 
-.upload-field .text-white {
-  color: #000 !important;
-}
-```
-
-That should fix the issue.
-
-Now try adding a new product and uploading an image. You should see the image in the preview area.
+All products should now have an Uploadthing URL for the images in the array. The images should be shown all around the site.

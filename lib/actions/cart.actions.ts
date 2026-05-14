@@ -61,6 +61,7 @@ export const addItemToCart = async (data: z.infer<typeof cartItemSchema>) => {
 
       // Revalidate product page
       revalidatePath(`/product/${product.slug}`);
+      revalidatePath("/cart");
 
       return {
         success: true,
@@ -94,6 +95,7 @@ export const addItemToCart = async (data: z.infer<typeof cartItemSchema>) => {
       });
 
       revalidatePath(`/product/${product.slug}`);
+      revalidatePath("/cart");
 
       return {
         success: true,
@@ -122,7 +124,6 @@ export async function getMyCart() {
 
   if (!cart) return undefined;
 
-  // Convert Decimal values to strings for compatibility with AddToCart component
   return convertToPlainObject({
     ...cart,
     items: cart.items as CartItem[],
@@ -174,6 +175,7 @@ export async function removeItemFromCart(productId: string) {
 
     // Revalidate product page
     revalidatePath(`/product/${product.slug}`);
+    revalidatePath("/cart");
 
     return {
       success: true,

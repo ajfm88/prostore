@@ -105,7 +105,7 @@ const AdminOverviewPage = async () => {
                   <TableRow key={order.id}>
                     <TableCell>{order.user?.name ? order.user.name : "Deleted user"}</TableCell>
                     <TableCell>{formatDateTime(order.createdAt).dateOnly}</TableCell>
-                    <TableCell>{formatCurrency(order.totalPrice())}</TableCell>
+                    <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
                     <TableCell>
                       <Link href={`/order/${order.id}`}>
                         <span className="px-2">Details</span>
