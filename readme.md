@@ -1,63 +1,86 @@
-# Product Cleanup
+# Is-Featured and Banner Image
 
-Right now, our sample products are still using a local path to the image. We need to change that to a public path. So we are going to delete all existing products and re-add them.
+Now that we can add products, I want to add a new field that will allow us to mark a product as featured and add a banner image. I will add a download of the banner images with this lesson. You can also get them from the public image folder or the repository.
 
-I am attaching the images for the products in this lesson. But you can also just get them from your `public/images/sample-products` folder.
+We will have a checkbox to mark a product as featured and if it is checked, it will display an image upload for the banner.
 
-Here are the products to add right now. We are not going to add one and two just yet because I want them to be featured and we don't have that option yet.
+Go into the `lib/validators.ts` file and make sure you uncomment the `isFeatured` and `banner` fields:
 
-- name: Polo Sporting Stretch Shirt
-- category: Mens Dress Shirts
-- description: Classic Polo style with modern comfort
-- price: 59.99
-- brand: Polo
-- stock: 500
+```ts
+// Schema for inserting a product
+export const insertProductSchema = z.object({
+  name: z.string().min(3, 'Name must be at least 3 characters'),
+  slug: z.string().min(3, 'Name must be at least 3 characters'),
+  category: z.string().min(3, 'Name must be at least 3 characters'),
+  brand: z.string().min(3, 'Name must be at least 3 characters'),
+  description: z.string().min(3, 'Name must be at least 3 characters'),
+  stock: z.coerce.number(),
+  images: z.array(z.string()).min(1, 'Product must have at least one image'),
+  isFeatured: z.boolean(),
+  banner: z.string().nullable(),
+  price: currency,
+});
+```
 
-Upload the images `p1-1.jpg` and `p1-2.jpg`.
+Open the `components/shared/admin/product-form.tsx` file and add the following above the return statement:
 
-- name: Brooks Brothers Long Sleeved Shirt
-- category: Mens Dress Shirts
-- description: Timeless style and premium comfort
-- price: 85.99
-- brand: Brooks Brothers
-- stock: 500
+```tsx
+const isFeatured = form.watch('isFeatured');
+const banner = form.watch('banner');
+```
 
-Upload the images `p2-1.jpg` and `p2-2.jpg`.
+Go to where you have the "isFeatured" comment. It should be below the image and above the description.
 
-- name: Tommy Hilfiger Classic Fit Dress Shirt
-- category: Mens Dress Shirts
-- description: A perfect blend of sophistication and comfort
-- price: 99.95
-- brand: Tommy Hilfiger
-- stock: 500
+Add the following `div` element:
 
-Upload the images `p3-1.jpg` and `p3-2.jpg`.
+```tsx
+<div className='upload-field'>
+  Featured Product
+  <Card>
+    <CardContent className='space-y-2 mt-2  '>
+      <FormField
+        control={form.control}
+        name='isFeatured'
+        render={({ field }) => (
+          <FormItem className='space-x-2 items-center'>
+            <FormControl>
+              <Checkbox
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            </FormControl>
+            <FormLabel>Is Featured?</FormLabel>
+          </FormItem>
+        )}
+      />
+      {isFeatured && banner && (
+        <Image
+          src={banner}
+          alt='banner image'
+          className=' w-full object-cover object-center rounded-sm'
+          width={1920}
+          height={680}
+        />
+      )}
+      {isFeatured && !banner && (
+        <UploadButton
+          endpoint='imageUploader'
+          onClientUploadComplete={(res: { url: string }[]) => {
+            form.setValue('banner', res[0].url);
+          }}
+          onUploadError={(error: Error) => {
+            toast({
+              variant: 'destructive',
+              description: `ERROR! ${error.message}`,
+            });
+          }}
+        />
+      )}
+    </CardContent>
+  </Card>
+</div>
+```
 
-- name: Calvin Klein Slim Fit Stretch Shirt
-- category: Mens Dress Shirts
-- description: Streamlined design with flexible stretch fabric
-- price: 99.95
-- brand: Calvin Klein
-- stock: 500
+We are using the `watch` method to get the value of the `isFeatured` and `banner` fields. We are also using the `UploadButton` component from the `uploadthing` package to upload the banner image.
 
-Upload the images `p4-1.jpg` and `p4-2.jpg`.
-
-- name: Polo Ralph Lauren Oxford Shirt
-- category: Mens Dress Shirts
-- description: Iconic Polo design with refined oxford fabric
-- price: 79.99
-- brand: Polo
-- stock: 0
-
-Upload the images `p5-1.jpg` and `p5-2.jpg`.
-
-- name: Polo Classic Pink Hoodie
-- category: Mens Sweatshirts
-- description: Soft, stylish, and perfect for laid-back days
-- price: 99.99
-- brand: Polo
-- stock: 500
-
-Upload the images `p6-1.jpg` and `p6-2.jpg`.
-
-All products should now have an Uploadthing URL for the images in the array. The images should be shown all around the site.
+Now you should have the option to set a product to featured ans add a banner. You can test it out by creating a featrued product and a banner. In the next lesson, we will be able to update products.
