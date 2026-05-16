@@ -1,86 +1,55 @@
-# Is-Featured and Banner Image
+# Update Product Form
 
-Now that we can add products, I want to add a new field that will allow us to mark a product as featured and add a banner image. I will add a download of the banner images with this lesson. You can also get them from the public image folder or the repository.
+We can add new products through the admin panel. Now we want to update existing products. We have the update action and we have the product form. One other thing we need is an action to get the product by id.
 
-We will have a checkbox to mark a product as featured and if it is checked, it will display an image upload for the banner.
-
-Go into the `lib/validators.ts` file and make sure you uncomment the `isFeatured` and `banner` fields:
+Open the `lib/actions/product.action.ts` file and add the following function:
 
 ```ts
-// Schema for inserting a product
-export const insertProductSchema = z.object({
-  name: z.string().min(3, 'Name must be at least 3 characters'),
-  slug: z.string().min(3, 'Name must be at least 3 characters'),
-  category: z.string().min(3, 'Name must be at least 3 characters'),
-  brand: z.string().min(3, 'Name must be at least 3 characters'),
-  description: z.string().min(3, 'Name must be at least 3 characters'),
-  stock: z.coerce.number(),
-  images: z.array(z.string()).min(1, 'Product must have at least one image'),
-  isFeatured: z.boolean(),
-  banner: z.string().nullable(),
-  price: currency,
-});
+// Get single product by id
+export async function getProductById(productId: string) {
+  const data = await prisma.product.findFirst({
+    where: { id: productId },
+  });
+
+  return convertToPlainObject(data);
+}
 ```
 
-Open the `components/shared/admin/product-form.tsx` file and add the following above the return statement:
+Create a new file at `app/admin/products/[id]/page.tsx`. This will be the update page.
+
+Add the following code:
 
 ```tsx
-const isFeatured = form.watch('isFeatured');
-const banner = form.watch('banner');
+import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+
+import ProductForm from '@/components/shared/admin/product-form';
+import { getProductById } from '@/lib/actions/product.actions';
+
+export const metadata: Metadata = {
+  title: 'Update product',
+};
+
+const UpdateProductPage = async (props: {
+  params: Promise<{
+    id: string;
+  }>;
+}) => {
+  const { id } = await props.params;
+
+  const product = await getProductById(id);
+
+  if (!product) return notFound();
+
+  return (
+    <div className='space-y-8 max-w-5xl mx-auto'>
+      <h1 className='h2-bold'>Update Product</h1>
+      <ProductForm type='Update' product={product} productId={product.id} />
+    </div>
+  );
+};
+
+export default UpdateProductPage;
 ```
 
-Go to where you have the "isFeatured" comment. It should be below the image and above the description.
-
-Add the following `div` element:
-
-```tsx
-<div className='upload-field'>
-  Featured Product
-  <Card>
-    <CardContent className='space-y-2 mt-2  '>
-      <FormField
-        control={form.control}
-        name='isFeatured'
-        render={({ field }) => (
-          <FormItem className='space-x-2 items-center'>
-            <FormControl>
-              <Checkbox
-                checked={field.value}
-                onCheckedChange={field.onChange}
-              />
-            </FormControl>
-            <FormLabel>Is Featured?</FormLabel>
-          </FormItem>
-        )}
-      />
-      {isFeatured && banner && (
-        <Image
-          src={banner}
-          alt='banner image'
-          className=' w-full object-cover object-center rounded-sm'
-          width={1920}
-          height={680}
-        />
-      )}
-      {isFeatured && !banner && (
-        <UploadButton
-          endpoint='imageUploader'
-          onClientUploadComplete={(res: { url: string }[]) => {
-            form.setValue('banner', res[0].url);
-          }}
-          onUploadError={(error: Error) => {
-            toast({
-              variant: 'destructive',
-              description: `ERROR! ${error.message}`,
-            });
-          }}
-        />
-      )}
-    </CardContent>
-  </Card>
-</div>
-```
-
-We are using the `watch` method to get the value of the `isFeatured` and `banner` fields. We are also using the `UploadButton` component from the `uploadthing` package to upload the banner image.
-
-Now you should have the option to set a product to featured ans add a banner. You can test it out by creating a featrued product and a banner. In the next lesson, we will be able to update products.
+Now click on the edit button on a product in the admin dashboard and you should see the update form with the values. Go ahead and change something like the stock and save and the product should be updated.
