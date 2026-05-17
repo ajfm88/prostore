@@ -1,55 +1,12 @@
-# Update Product Form
+# Section Intro
 
-We can add new products through the admin panel. Now we want to update existing products. We have the update action and we have the product form. One other thing we need is an action to get the product by id.
+In this section, we're going to take care of two things. First, the user managment in the admin aream then the admin search functionality.
 
-Open the `lib/actions/product.action.ts` file and add the following function:
+So we'll create an action and then use that action within a page to get and display users.
 
-```ts
-// Get single product by id
-export async function getProductById(productId: string) {
-  const data = await prisma.product.findFirst({
-    where: { id: productId },
-  });
+We'll also add the ability to delete users using the same delete-dialog component that we used for orders and products.
 
-  return convertToPlainObject(data);
-}
-```
+We want to be able to edit some of the user info, so we'll add that.
 
-Create a new file at `app/admin/products/[id]/page.tsx`. This will be the update page.
+Then once the users are done, we'll move to the admin search. If you notice, there is a search in the header on the products, orders and users pages. What I want is if they search while on the products page, then it searches the products. Then we'll do the same for the orders and users as well.
 
-Add the following code:
-
-```tsx
-import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-
-import ProductForm from '@/components/shared/admin/product-form';
-import { getProductById } from '@/lib/actions/product.actions';
-
-export const metadata: Metadata = {
-  title: 'Update product',
-};
-
-const UpdateProductPage = async (props: {
-  params: Promise<{
-    id: string;
-  }>;
-}) => {
-  const { id } = await props.params;
-
-  const product = await getProductById(id);
-
-  if (!product) return notFound();
-
-  return (
-    <div className='space-y-8 max-w-5xl mx-auto'>
-      <h1 className='h2-bold'>Update Product</h1>
-      <ProductForm type='Update' product={product} productId={product.id} />
-    </div>
-  );
-};
-
-export default UpdateProductPage;
-```
-
-Now click on the edit button on a product in the admin dashboard and you should see the update form with the values. Go ahead and change something like the stock and save and the product should be updated.
