@@ -1,85 +1,178 @@
-# Edit User Page
+# Edit User Form
 
-We want admins to be able to edit user information.
-
-## updateUserSchema
-
-Let's start by adding the Zod schema for updating a user. Open the `lib/validators.ts` file and add the following code:
-
-```ts
-// Update User Schema
-export const updateUserSchema = updateProfileSchema.extend({
-  id: z.string().min(1, 'Id is required'),
-  name: z.string().min(3, 'Name must be at least 3 characters'),
-  role: z.string().min(1, 'Role is required'),
-});
-```
-
-We have the id, name and role fields.
-
-## Role Constant
-
-We are also going to create a constant for the role. Open the `lib/constants/index.ts` file and add the following code:
-
-```ts
-export const USER_ROLES = process.env.USER_ROLES
-  ? process.env.USER_ROLES.split(', ')
-  : ['admin', 'user'];
-```
-
-We first check to see if the roles are set in the environment variables. If they are, we split them by a comma and space. If they are not, we set the roles to an array with the admin and user roles. This makes it easier to add or remove roles in the future.
-
-We'll go ahead and add the roles in the `.env` file.
-
-```
-USER_ROLES=admin, user
-```
-
-## ShadCN Select
-
-We are going to use the select component from ShadCN. Open a terminal and run the following command:
-
-```bash
-npx shadcn@latest add select
-```
-
-## User Page
-
-Let's create the update user form. Create a file at `app/admin/users/[id]/page.tsx` and add the following code:
+Now let's add the edit user form. Create a new file at `app/admin/users/[id]/update-user-form.tsx` and add the following code for now:
 
 ```tsx
-import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { getUserById } from '@/lib/actions/user.actions';
+"use client";
 
-export const metadata: Metadata = {
-  title: 'Update user',
-};
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { USER_ROLES } from "@/lib/constants";
+import { updateUserSchema } from "@/lib/validator";
+import { ControllerRenderProps } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
-const UpdateUserPage = async (props: {
-  params: Promise<{
-    id: string;
-  }>;
-}) => {
-  const { id } = await props.params;
+const updateUserForm = ({ user }: { user: z.infer<typeof updateUserSchema> }) => {
+  const router = useRouter();
+  const { toast } = useToast();
 
-  const user = await getUserById(id);
-
-  if (!user) notFound();
-
-  console.log(user);
+  const form = useForm<z.infer<typeof updateUserSchema>>({
+    resolver: zodResolver(updateUserSchema),
+    defaultValues: user,
+  });
 
   return (
-    <div className='space-y-8 max-w-lg mx-auto'>
-      <h1 className='h2-bold'>Update User</h1>
-      {/* FORM HERE */}
-    </div>
+    <Form {...form}>
+      <form className="space-y-4">form</form>
+    </Form>
   );
 };
 
-export default UpdateUserPage;
+export default updateUserForm;
 ```
 
-We are bringing in the `getUserById` action that we already created to get the user. We are getting the id from the params and passing it to the action. We are also checking to see if the user exists. If it doesn't, we are going to use the `notFound` function to return a 404 page. We are also logging the user to the console.
+We are bringing in a bunch of UI components, hooks and some other stuff. The component function will take in a user prop with the type of `z.infer<typeof updateUserSchema>`. We are initializing the form with the `useForm` hook from React Hook Form with the default values from the user prop. We are also using the `zodResolver` from `@hookform/resolvers/zod` to validate the form data against the schema.
 
-In the next lesson, we will work on the form.
+Then we're returning an empty form for now. Let's add it to the page. Open the `app/admin/users/[id]/page.tsx` file and import the `updateUserForm` component and add it to the page.
+
+```tsx
+import UpdateUserForm from "./update-user-form";
+```
+
+```tsx
+return (
+  <div className="space-y-8 max-w-lg mx-auto">
+    <h1 className="h2-bold">Update User</h1>
+    <UpdateUserForm user={user} /> 👈 Add this line
+  </div>
+);
+```
+
+We already have the user to pass in. For now, you will just see the text 'form' on the page. Let's start to add some fields to the form.
+
+Here is the first `div` with the email field:
+
+```tsx
+{
+  /* Email */
+}
+<div>
+  <FormField
+    control={form.control}
+    name="email"
+    render={({
+      field,
+    }: {
+      field: ControllerRenderProps<z.infer<typeof updateUserSchema>, "email">;
+    }) => (
+      <FormItem className="w-full">
+        <FormLabel>Email</FormLabel>
+        <FormControl>
+          <Input disabled={true} placeholder="Enter user email" {...field} />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</div>;
+```
+
+This is disabled because we don't want to be able to change this here. Save it and you should see the input with the text.
+
+Next, we have the name field:
+
+```tsx
+{
+  /* Name */
+}
+<div>
+  <FormField
+    control={form.control}
+    name="name"
+    render={({
+      field,
+    }: {
+      field: ControllerRenderProps<z.infer<typeof updateUserSchema>, "name">;
+    }) => (
+      <FormItem className="w-full">
+        <FormLabel>Name</FormLabel>
+        <FormControl>
+          <Input placeholder="Enter user name" {...field} />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</div>;
+```
+
+Next is the role field. Here we will use the select component from the ShadCN UI.
+
+```tsx
+{
+  /* Role */
+}
+<div>
+  <FormField
+    control={form.control}
+    name="role"
+    render={({
+      field,
+    }: {
+      field: ControllerRenderProps<z.infer<typeof updateUserSchema>, "role">;
+    }) => (
+      <FormItem className=" items-center">
+        <FormLabel>Role</FormLabel>
+        <Select onValueChange={field.onChange} value={field.value.toString()}>
+          <FormControl>
+            <SelectTrigger>
+              <SelectValue placeholder="Select a role" />
+            </SelectTrigger>
+          </FormControl>
+          <SelectContent>
+            {USER_ROLES.map((role) => (
+              <SelectItem key={role} value={role}>
+                {role}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</div>;
+```
+
+The `USER_ROLES` is an array of strings that we defined in the `lib/constants.ts` file. We are mapping over it and creating a select item for each role. We are also using the `onValueChange` prop to update the value of the field when the user selects a new value.
+
+Finally, we have the button to submit the form.
+
+```tsx
+<div className="flex-between">
+  <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+    {form.formState.isSubmitting ? "Submitting..." : `Update User `}
+  </Button>
+</div>
+```
+
+Now that we have the form, in the next lesson, we will add a submit handler and the update action that it will call.
