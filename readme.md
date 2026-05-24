@@ -1,87 +1,90 @@
-# Admin Search Form
+# Orders Search
 
-Now we are going to make the search bar in the admin area work. It will search products on the products page, orders on the orders and users on the users page.
+Now that we have our `admin-search` component and product search working in the admin area, let's add the same functionality to orders.
 
-Let's create a new file at `components/admin/admin-search.tsx` and add the following code:
+We will start by having the `getAllOrders` function take in a query and filter
+by it.
 
-```tsx
-'use client';
-import { Input } from '@/components/ui/input';
-import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { usePathname } from 'next/navigation';
+Open the `orders.actions.ts` file and add the following code for the `getAllOrders` function:
 
-const AdminSearch = () => {
-  const pathname = usePathname();
-  const formActionUrl = pathname.includes('/admin/orders')
-    ? '/admin/orders'
-    : pathname.includes('/admin/users')
-    ? '/admin/users'
-    : '/admin/products';
+```ts
+export async function getAllOrders({
+  limit = PAGE_SIZE,
+  page,
+  query,
+}: {
+  query: string;
+  limit?: number;
+  page: number;
+}) {
+  const queryFilter: Prisma.OrderWhereInput =
+    query && query !== 'all'
+      ? {
+          user: {
+            name: {
+              contains: query,
+              mode: 'insensitive',
+            } as Prisma.StringFilter,
+          },
+        }
+      : {};
 
-  const searchParams = useSearchParams();
-  const [queryValue, setQueryValue] = useState(searchParams.get('query') || '');
-
-  useEffect(() => {
-    setQueryValue(searchParams.get('query') || '');
-  }, [searchParams]);
-
-  return (
-    <form action={formActionUrl} method='GET'>
-      <Input
-        type='search'
-        placeholder='Search...'
-        name='query'
-        value={queryValue}
-        onChange={(e) => setQueryValue(e.target.value)}
-        className='md:w-[100px] lg:w-[300px]'
-      />
-      <button type='submit' className='sr-only'>
-        Search
-      </button>
-    </form>
-  );
-};
-
-export default AdminSearch;
+  const data = await prisma.order.findMany({
+    where: {
+      ...queryFilter,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    skip: (page - 1) * limit,
+    include: { user: { select: { name: true } } },
+    include: {
+      user: {
+        select: { name: true },
+      },
+    },
+  });
 ```
 
-I added `sr-only` to the button, which will make it only visible to screen readers. So we hit `enter` to submit the form.
+## Changes
 
-We are getting the path name and the form action url. Then we set the `queryValue` to the `query` value in the URL. When we type in the search, we set that value to whatever is typed. When we submit, we submit to `formActionUrl`, which could be either `admin/orders`, `admin/products` or `admin/users`.
+We added a new param of `query`.
 
-## Add Form To Layout
+We then added the `QueryFilter` and added it to the `where` object in the query.
 
-Now let's add the form to the admin layout. Open the `app/admin/layout.tsx` file and add the following import:
+## Orders Page
 
-```tsx
-import AdminSearch from '@/components/shared/admin/admin-search';
+Now open the `app/admin/orders/page.tsx` file and make the following changes:
+
+Add a new `query` param to the `SearchParams` prop:
+
+```ts
+const AdminOrdersPage = async (props: {
+  searchParams: Promise<{ page: string; query: string }>;
+}) => {//...}
 ```
 
-Replace the `Input` with the component:
-
 ```tsx
-<div className='ml-auto flex items-center space-x-4'>
-  <AdminSearch />
-  <Menu />
-</div>
+const { page = '1', query: searchText } = searchParams;
 ```
 
-Remove the import for the `Input` as you do not need it anymore.
+Pass the query into the `getAllOrders` function call:
 
-## Products Remove Filter
+```tsx
+const orders = await getAllOrders({
+  page: Number(page),
+  query: searchText,
+});
+```
 
-If you go to `/admin/products` it will already work because we already implemented this in the `getAllProducts` action.
-
-Let's add an option to remove the filter. Open the `app/admin/products/page.tsx` and replace the `h1` heading with the following:
+In the return, replace the `h1` heading with the following:
 
 ```tsx
 <div className='flex items-center gap-3'>
-  <h1 className='h2-bold'>Products</h1>
+  <h1 className='h2-bold'>Orders</h1>
   {searchText && (
     <div>
       Filtered by <i>&quot;{searchText}&quot;</i>{' '}
-      <Link href={`/admin/products`}>
+      <Link href={`/admin/orders`}>
         <Button variant='outline' size='sm'>
           Remove Filter
         </Button>
@@ -91,6 +94,6 @@ Let's add an option to remove the filter. Open the `app/admin/products/page.tsx`
 </div>
 ```
 
-Now you can remove the filter.
+Now you should see an option to remove the filter.
 
-Now we want it to work with orders and users.
+Let's do users next.
