@@ -1,96 +1,15 @@
-# Users Search
+# Section Intro
 
-Let's add the same search functionality to users.
+In this section, we'll be doing quite a few things. First, we're going to use a ShadCN drawer component fot the categories. We will have a button with an icon to the left of the logo in the header on main pages. This will open a drawer with the categories.
 
-We will start by having the `getAllUsers` function take in a query and filter
-by it.
+Then we're going to create the featured product banner. So if the product is marked as featured and has a banner, it will show up im this component. There will be arrow buttons to scroll through the banners on the homepage.
 
-Open the `orders.actions.ts` file and add the following code for the `getAllOrders` function:
+Next, we want to work on the search and filtering. We're going to create the search form in a component and put it in the header. Right now, the input is just hardcoded.
 
-```ts
-export async function getAllUsers({
-  limit = PAGE_SIZE,
-  page,
-  query,
-}: {
-  limit?: number;
-  page: number;
-  query: string;
-}) {
-  const queryFilter: Prisma.UserWhereInput =
-    query && query !== 'all'
-      ? {
-          name: {
-            contains: query,
-            mode: 'insensitive',
-          } as Prisma.StringFilter,
-        }
-      : {};
+We'll create a search page for that form to submit to and we will get the search params like category, query and sort.
 
-  const data = await prisma.user.findMany({
-    where: {
-      ...queryFilter,
-    },
-    orderBy: { createdAt: 'desc' },
-    take: limit,
-    skip: (page - 1) * limit,
-  });
+Then we need to take those values and use them in the action to apply the filters.
 
-  const dataCount = await prisma.user.count();
+We also need to add all the filter links on to the search page. So they can click on a specific category, rating, price, etc.
 
-  return {
-    data,
-    totalPages: Math.ceil(dataCount / limit),
-  };
-}
-```
-
-## Changes
-
-We added a new param of `query`.
-
-We then added the `QueryFilter` and added it to the `where` object in the query.
-
-## Users Page
-
-Now open the `app/admin/users/page.tsx` file and make the following changes:
-
-Add a new `query` param to the `SearchParams` prop:
-
-```ts
-const AdminUsersPage = async (props: {
-  searchParams: Promise<{ page: string; query: string }>;
-}) => {//...}
-```
-
-```tsx
-const { page = '1', query: searchText } = searchParams;
-```
-
-Pass the query into the `getAllUsers` function call:
-
-```tsx
-const users = await getAllUsers({ page: Number(page), query: searchText });
-```
-
-In the return, replace the `h1` heading with the following:
-
-```tsx
-<div className='flex items-center gap-3'>
-  <h1 className='h2-bold'>Users</h1>
-  {searchText && (
-    <div>
-      Filtered by <i>&quot;{searchText}&quot;</i>{' '}
-      <Link href={`/admin/users`}>
-        <Button variant='outline' size='sm'>
-          Remove Filter
-        </Button>
-      </Link>
-    </div>
-  )}
-</div>
-```
-
-Now you should see an option to remove the filter.
-
-Now we have admin search functionality.
+We'll also implement sorting by price, rating and date.
