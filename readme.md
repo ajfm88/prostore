@@ -1,128 +1,131 @@
-# Category Drawer
+# Featured Products Carousel
 
-We are going to start on the drawer component on the homepage. This will show a list of categories so that we can navigate to the category pages.
+We are going to add a carousel on the homepage that will show the featured products and their banners.
 
-## Get All Categories Action
+## Carousel Component & Autoplay Plugin
 
-Before we create the component, let's add the action that will give us the data.
+We are going to use the ShadCN Carousel component and the Embla Carousel Autoplay plugin so that it plays automatically when you visit the page.
 
-Open the `lib/actions/product.actions.ts` file and add the following function:
+```bash
+npx shadcn@latest add carousel
+npm install embla-carousel-autoplay
+```
+
+## Featured Products Action
+
+We need to create an action that will get the featured products. Open the `lib/actions/product.actions.ts` file and add the following function:
 
 ```ts
-// Get product categories
-export async function getAllCategories() {
-  const data = await prisma.product.groupBy({
-    by: ['category'],
-    _count: true,
+// Get featured products
+export async function getFeaturedProducts() {
+  const data = await prisma.product.findMany({
+    where: { isFeatured: true },
+    orderBy: { createdAt: 'desc' },
+    take: 4,
   });
 
-  return data;
+  return convertToPlainObject(data);
 }
 ```
 
-This is simple. We are just getting the categories and the count of products in each category.
+## Carousel Component
 
-## ShadCN Drawer Component
+Create a new file at `components/shared/product/product-carousel.tsx` and add the following code:
 
-We need to install the ShadCN Drawer component. Open a terminal and run the following command:
+```tsx
+'use client';
 
-```bash
-npx shadcn@latest add drawer
+import Autoplay from 'embla-carousel-autoplay';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel';
+import { Product } from '@/types';
+import Link from 'next/link';
+import Image from 'next/image';
+
+export function ProductCarousel({ data }: { data: Product[] }) {
+  return (
+    <Carousel
+      className='w-full mb-12'
+      opts={{
+        loop: true,
+      }}
+      plugins={[
+        Autoplay({
+          delay: 2000,
+          stopOnInteraction: true,
+          stopOnMouseEnter: true,
+        }),
+      ]}
+    >
+      <CarouselContent>
+        {data.map((product: Product) => (
+          <CarouselItem key={product.id}>
+            <Link href={`/product/${product.slug}`}>
+              <div className='relative   mx-auto  '>
+                <Image
+                  alt={product.name}
+                  src={product.banner!}
+                  width='0'
+                  height='0'
+                  sizes='100vw'
+                  className='w-full h-auto'
+                />
+                <div className='absolute inset-0 flex items-end justify-center'>
+                  <h2 className=' bg-gray-900 bg-opacity-50 text-2xl font-bold px-2 text-white  '>
+                    {product.name}
+                  </h2>
+                </div>
+              </div>
+            </Link>
+          </CarouselItem>
+        ))}
+      </CarouselContent>
+      <CarouselPrevious />
+      <CarouselNext />
+    </Carousel>
+  );
+}
 ```
 
-## Categories Drawer Component
+Let's go over this code.
 
-Let's create a new component at `components/shared/header/categories-drawer.tsx` and add the following code:
+We are bringing in the `Carousel` component from the ShadCN library. We are also bringing in the `Autoplay` plugin from the `embla-carousel-autoplay` library. We are also bringing in the `Product` type from the `types.ts` file.
+
+The component takes in a data prop. We set the `Carousel` component with an option of `loop: true` and plugins of `Autoplay`. We are also mapping over the data and rendering a `CarouselItem` for each product. We are also rendering a `CarouselPrevious` and `CarouselNext` component.
+
+Let's bring in both the action and the component into the `app/(root)/page.tsx` file.
 
 ```tsx
 import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from '@/components/ui/drawer';
-import { getAllCategories } from '@/lib/actions/product.actions';
-import { Button } from '@/components/ui/button';
-import { MenuIcon } from 'lucide-react';
-import Link from 'next/link';
-
-const CategoriesDrawer = async () => {
-  const categories = await getAllCategories();
-
-  return (
-    <Drawer direction='left'>
-      <DrawerTrigger asChild>
-        <Button variant='outline'>
-          <MenuIcon />
-        </Button>
-      </DrawerTrigger>
-      <DrawerContent className='h-full max-w-sm'>
-        <DrawerHeader>
-          <DrawerTitle>Select a category</DrawerTitle>
-          <div className='space-y-1'>
-            {categories.map((x) => (
-              <Button
-                className='w-full justify-start'
-                variant='ghost'
-                key={x.category}
-                asChild
-              >
-                <DrawerClose asChild>
-                  <Link href={`/search?category=${x.category}`}>
-                    {x.category} ({x._count})
-                  </Link>
-                </DrawerClose>
-              </Button>
-            ))}
-          </div>
-        </DrawerHeader>
-      </DrawerContent>
-    </Drawer>
-  );
-};
-
-export default CategoriesDrawer;
+  getFeaturedProducts,
+  getLatestProducts,
+} from '@/lib/actions/product.actions';
+import ProductCarousel from '@/components/shared/product/product-carousel';
 ```
 
-We are bringing in the `getAllCategories` action from the `product.actions.ts` file. We are also using the `Drawer` component from the ShadCN library. We map over the categories and render a button for each category. The `DrawerClose` component is used to close the drawer when the button is clicked and we can have it navigate to the category page, which we will create later.
-
-## Add Categories Drawer to Header
-
-Open the `components/shared/header/index.tsx` file and add import the `CategoriesDrawer` component:
+Then get the featured products. Add this above the return statement:
 
 ```tsx
-import CategoriesDrawer from './categories-drawer';
+const featuredProducts = await getFeaturedProducts();
 ```
 
-It's up to you on where you want to place this. Since we're going to have it open on the left, I am going to place it to the left of the logo. If you want to add it to the menu on the right, you can do that as well.
-
-Here is where I will embed it:
+Now in the return, check if there are any featured products. If there are, render the `ProductCarousel` component.
 
 ```tsx
-<header className='w-full border-b'>
-  <div className='wrapper flex-between'>
-    <div className='flex-start'>
-      <CategoriesDrawer />
-      <Link href='/' className='flex-start ml-4'>
-        <Image
-          priority={true}
-          src='/images/logo.svg'
-          width={48}
-          height={48}
-          alt={`${APP_NAME} logo`}
-        />
-        <span className='hidden lg:block font-bold text-2xl ml-3'>
-          {APP_NAME}
-        </span>
-      </Link>
-    </div>
-    <Menu />
+return (
+  <div>
+    {featuredProducts.length > 0 && <ProductCarousel data={featuredProducts} />}
+
+    <ProductList title='Newest Arrivals' data={latestProducts} />
   </div>
-</header>
+);
 ```
 
-I also added a class of `ml-4` to the logo so that it is not right next to the drawer.
+Now you should see the carousel on the homepage.
 
-Now you should be able to click on the button and see the drawer open.
+<img src="images/carousel.png" alt="carousel" />
