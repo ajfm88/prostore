@@ -1,131 +1,117 @@
-# Featured Products Carousel
+# Search Component
 
-We are going to add a carousel on the homepage that will show the featured products and their banners.
+We are going to create a search component that allows users to search for products with a keyword text field and a category dropdown. Once we get to the search page, there will be all kinds of filters that the user can use to filter the products such as the price, rating, and sort.
 
-## Carousel Component & Autoplay Plugin
-
-We are going to use the ShadCN Carousel component and the Embla Carousel Autoplay plugin so that it plays automatically when you visit the page.
-
-```bash
-npx shadcn@latest add carousel
-npm install embla-carousel-autoplay
-```
-
-## Featured Products Action
-
-We need to create an action that will get the featured products. Open the `lib/actions/product.actions.ts` file and add the following function:
-
-```ts
-// Get featured products
-export async function getFeaturedProducts() {
-  const data = await prisma.product.findMany({
-    where: { isFeatured: true },
-    orderBy: { createdAt: 'desc' },
-    take: 4,
-  });
-
-  return convertToPlainObject(data);
-}
-```
-
-## Carousel Component
-
-Create a new file at `components/shared/product/product-carousel.tsx` and add the following code:
+Let's create a new file at `components/shared/header/search.tsx` and add the following code:
 
 ```tsx
-'use client';
-
-import Autoplay from 'embla-carousel-autoplay';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '@/components/ui/carousel';
-import { Product } from '@/types';
-import Link from 'next/link';
-import Image from 'next/image';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { getAllCategories } from '@/lib/actions/product.actions';
+import { SearchIcon } from 'lucide-react';
 
-export function ProductCarousel({ data }: { data: Product[] }) {
+const Search = async () => {
+  const categories = await getAllCategories();
+
   return (
-    <Carousel
-      className='w-full mb-12'
-      opts={{
-        loop: true,
-      }}
-      plugins={[
-        Autoplay({
-          delay: 2000,
-          stopOnInteraction: true,
-          stopOnMouseEnter: true,
-        }),
-      ]}
-    >
-      <CarouselContent>
-        {data.map((product: Product) => (
-          <CarouselItem key={product.id}>
-            <Link href={`/product/${product.slug}`}>
-              <div className='relative   mx-auto  '>
-                <Image
-                  alt={product.name}
-                  src={product.banner!}
-                  width='0'
-                  height='0'
-                  sizes='100vw'
-                  className='w-full h-auto'
-                />
-                <div className='absolute inset-0 flex items-end justify-center'>
-                  <h2 className=' bg-gray-900 bg-opacity-50 text-2xl font-bold px-2 text-white  '>
-                    {product.name}
-                  </h2>
-                </div>
-              </div>
-            </Link>
-          </CarouselItem>
-        ))}
-      </CarouselContent>
-      <CarouselPrevious />
-      <CarouselNext />
-    </Carousel>
+    <form action='/search' method='GET'>
+      <div className='flex w-full max-w-sm items-center space-x-2'>
+        <Select name='category'>
+          <SelectTrigger className='w-[180px]'>
+            <SelectValue placeholder='All' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem key={'All'} value={'all'}>
+              All
+            </SelectItem>
+            {categories.map((x) => (
+              <SelectItem key={x.category} value={x.category}>
+                {x.category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          name='q'
+          type='text'
+          placeholder='Search...'
+          className='md:w-[100px] lg:w-[300px]'
+        />
+        <Button>
+          <SearchIcon />
+        </Button>
+      </div>
+    </form>
   );
-}
+};
+
+export default Search;
 ```
 
-Let's go over this code.
+We are using the `getAllCategories` action to get all the categories from the database. We are using the `Select` component from the `@/components/ui/select` component. We are using the `SelectTrigger` component to trigger the dropdown and the `SelectContent` component to display the dropdown options. We are using the `Input` component from the `@/components/ui/input` component. We also have some icons from the `lucide-react` package.
 
-We are bringing in the `Carousel` component from the ShadCN library. We are also bringing in the `Autoplay` plugin from the `embla-carousel-autoplay` library. We are also bringing in the `Product` type from the `types.ts` file.
+The form action is set to `/search`. We will create the search page soon.
 
-The component takes in a data prop. We set the `Carousel` component with an option of `loop: true` and plugins of `Autoplay`. We are also mapping over the data and rendering a `CarouselItem` for each product. We are also rendering a `CarouselPrevious` and `CarouselNext` component.
+## Use The Search Component
 
-Let's bring in both the action and the component into the `app/(root)/page.tsx` file.
+Now open the `components/shared/header/index.tsx` file and import the `Search` component:
 
 ```tsx
-import {
-  getFeaturedProducts,
-  getLatestProducts,
-} from '@/lib/actions/product.actions';
-import ProductCarousel from '@/components/shared/product/product-carousel';
+import Search from './search';
 ```
 
-Then get the featured products. Add this above the return statement:
+We are going to show the search component within the header on large screens but on small screens, we'll show it in the menu drawer.
+
+Add the following code to the `Header` component right above the `Menu` component:
 
 ```tsx
-const featuredProducts = await getFeaturedProducts();
+<div className='hidden md:block'>
+  <Search />
+</div>
 ```
 
-Now in the return, check if there are any featured products. If there are, render the `ProductCarousel` component.
+Now open the `components/shared/header/menu.tsx` file and import the `Search` component:
 
 ```tsx
-return (
-  <div>
-    {featuredProducts.length > 0 && <ProductCarousel data={featuredProducts} />}
+import Search from './search';
+```
 
-    <ProductList title='Newest Arrivals' data={latestProducts} />
+And add the `<div>` with the `<Search />` component within the `<SheetContent>` component:
+
+```tsx
+<SheetContent className='flex flex-col items-start'>
+  <div className='mt-10'>
+    <Search />
   </div>
-);
+  // ...
+</SheetContent>
 ```
 
-Now you should see the carousel on the homepage.
+## Add Search Page
 
-<img src="images/carousel.png" alt="carousel" />
+The search page ultimately will have a lot of filters and so on, but for now, I just want the page to show, so let's just show some text that says "Search Page".
+
+Create a file at `app/(root)/search/page.tsx` and add the following code:
+
+```tsx
+const SearchPage = () => {
+  return (
+    <>
+      <h1>Search Page</h1>
+    </>
+  );
+};
+
+export default SearchPage;
+```
+
+Now if you submit the search form, you should see the search page.
+
+Next, we will add some new functionality to the `getAllProducts` action so that we can filter the products by category, price, rating, etc.
