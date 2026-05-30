@@ -1,107 +1,49 @@
-# Search Component
+# Search Page
 
-We are going to create a search component that allows users to search for products with a keyword text field and a category dropdown. Once we get to the search page, there will be all kinds of filters that the user can use to filter the products such as the price, rating, and sort.
+Now that we have the search component that takes us to the search page, there is quite a bit to do. We need to add the filters to the `getAllProducts` action for things like category, price, sorting, etc. We need to add the filter UI and handlers to the search page. There will be a lot of logic to do here, so we will go through it step by step.
 
-Let's create a new file at `components/shared/header/search.tsx` and add the following code:
+I struggled with how I wanted to do this. I didn't want to just add a bunch of code to the action without being able to test it. I thought about writing some Jest tests, but that got really complicated and I didn't want to spend too much time with Jest.
+
+So I think the best thing is to start working on the search page and add to the action as we go so that we can test the filters.
+
+Let's open the `app/(root)/search/page.tsx` file.
+
+Let's bring in the imports we need:
 
 ```tsx
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { getAllCategories } from '@/lib/actions/product.actions';
-import { SearchIcon } from 'lucide-react';
-
-const Search = async () => {
-  const categories = await getAllCategories();
-
-  return (
-    <form action='/search' method='GET'>
-      <div className='flex w-full max-w-sm items-center space-x-2'>
-        <Select name='category'>
-          <SelectTrigger className='w-[180px]'>
-            <SelectValue placeholder='All' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem key={'All'} value={'all'}>
-              All
-            </SelectItem>
-            {categories.map((x) => (
-              <SelectItem key={x.category} value={x.category}>
-                {x.category}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          name='q'
-          type='text'
-          placeholder='Search...'
-          className='md:w-[100px] lg:w-[300px]'
-        />
-        <Button>
-          <SearchIcon />
-        </Button>
-      </div>
-    </form>
-  );
-};
-
-export default Search;
+import Pagination from "@/components/shared/pagination";
+import ProductCard from "@/components/shared/product/product-card";
+import { Button } from "@/components/ui/button";
+import { getAllCategories, getAllProducts } from "@/lib/actions/product.actions";
+import Link from "next/link";
 ```
 
-We are using the `getAllCategories` action to get all the categories from the database. We are using the `Select` component from the `@/components/ui/select` component. We are using the `SelectTrigger` component to trigger the dropdown and the `SelectContent` component to display the dropdown options. We are using the `Input` component from the `@/components/ui/input` component. We also have some icons from the `lucide-react` package.
+We are using the `getAllCategories` and `getAllProducts` actions from the `product.actions` file.
 
-The form action is set to `/search`. We will create the search page soon.
-
-## Use The Search Component
-
-Now open the `components/shared/header/index.tsx` file and import the `Search` component:
+Let's create a basic component that takes in `searchParams`:
 
 ```tsx
-import Search from './search';
-```
+const SearchPage = async (props: {
+  searchParams: Promise<{
+    q?: string;
+    category?: string;
+    price?: string;
+    rating?: string;
+    sort?: string;
+    page?: string;
+  }>;
+}) => {
+  const {
+    q = "all",
+    category = "all",
+    price = "all",
+    rating = "all",
+    sort = "newest",
+    page = "1",
+  } = await props.searchParams;
 
-We are going to show the search component within the header on large screens but on small screens, we'll show it in the menu drawer.
+  console.log(q, category, price, rating, sort, page);
 
-Add the following code to the `Header` component right above the `Menu` component:
-
-```tsx
-<div className='hidden md:block'>
-  <Search />
-</div>
-```
-
-Now open the `components/shared/header/menu.tsx` file and import the `Search` component:
-
-```tsx
-import Search from './search';
-```
-
-And add the `<div>` with the `<Search />` component within the `<SheetContent>` component:
-
-```tsx
-<SheetContent className='flex flex-col items-start'>
-  <div className='mt-10'>
-    <Search />
-  </div>
-  // ...
-</SheetContent>
-```
-
-## Add Search Page
-
-The search page ultimately will have a lot of filters and so on, but for now, I just want the page to show, so let's just show some text that says "Search Page".
-
-Create a file at `app/(root)/search/page.tsx` and add the following code:
-
-```tsx
-const SearchPage = () => {
   return (
     <>
       <h1>Search Page</h1>
@@ -112,6 +54,114 @@ const SearchPage = () => {
 export default SearchPage;
 ```
 
-Now if you submit the search form, you should see the search page.
+We destructured the `searchParams` to get the search query, category, price, rating, sort, and page and we are logging them to the console. We are also setting default values for them.
 
-Next, we will add some new functionality to the `getAllProducts` action so that we can filter the products by category, price, rating, etc.
+Go into the search component and select a category and type something in the search bar. You should see the search query, category, price, rating, sort, and page in the console.
+
+Delete the console log statement.
+
+Now let's have it call the `getAllProducts` action and pass in the search query, category, price, rating, sort, and page and log the products.
+
+Add the following above the return statement:
+
+```tsx
+// Get products
+const products = await getAllProducts({
+  category,
+  query: q,
+  price,
+  rating,
+  page: Number(page),
+  sort,
+});
+```
+
+## Edit The Action
+
+Now let's open the `lib/actions/product.actions.ts` file and go to the `getAllProducts` action. Right now it just takes in the query, limit, and page. We need to add the category, price, rating, and sort.
+
+Add the following parameters to the `getAllProducts` action:
+
+```ts
+export async function getAllProducts({
+  query,
+  limit = PAGE_SIZE,
+  page,
+  category,
+  price,
+  rating,
+  sort,
+}: {
+  query: string;
+  category: string;
+  limit?: number;
+  page: number;
+  price?: string;
+  rating?: string;
+  sort?: string;
+}) {}
+```
+
+## Showing The Results
+
+Let's add the following to the search page return statement:
+
+```tsx
+return (
+  <div className="grid md:grid-cols-5 md:gap-5">
+    <div className="filter-links">{/* FILTERS */}</div>
+    <div className="md:col-span-4 space-y-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {products!.data.length === 0 && <div>No product found</div>}
+        {products!.data.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
+      {products!.totalPages! > 1 && <Pagination page={page} totalPages={products!.totalPages} />}
+    </div>
+  </div>
+);
+```
+
+You should see all products. We have not implemented the filters yet, so we are just showing all products.
+
+## View All Products Button
+
+This is essentially the products page. It uses pagination and will have all kinds of filters. So on the homepage, I want a button to go to this /search page under the new arrivals section.
+
+Create a new file at `components/view-all-products-button.tsx` and add the following code:
+
+```tsx
+"use client";
+
+import { Button } from "./ui/button";
+import { useRouter } from "next/navigation";
+
+const ViewAllProductsButton = () => {
+  const router = useRouter();
+
+  return (
+    <div className="flex justify-center items-center my-8">
+      <Button onClick={() => router.push("/search")} className="px-8 py-4 text-lg font-semibold">
+        View All Products
+      </Button>
+    </div>
+  );
+};
+
+export default ViewAllProductsButton;
+```
+
+Now let's import it into the `app/(root)/page.tsx` file and import it:
+
+```tsx
+import ViewAllProductsButton from "@/components/view-all-products-button";
+```
+
+Add it below the `ProductList` component:
+
+```tsx
+<ViewAllProductsButton />
+```
+
+In the next few lessons, we will start to add filters and sorting.
