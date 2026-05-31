@@ -1,5 +1,6 @@
 "use server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/db/prisma";
 import { convertToPlainObject, formatError } from "../utils";
 import { LATEST_PRODUCTS_LIMIT, PAGE_SIZE } from "../constants";
@@ -41,8 +42,43 @@ export async function getAllProducts({
   rating?: string;
   sort?: string;
 }) {
+  // Filter by query
+  const queryFilter: Prisma.ProductWhereInput =
+    query && query !== "all"
+      ? {
+          name: {
+            contains: query,
+            mode: "insensitive",
+          } as Prisma.StringFilter,
+        }
+      : {};
+
+  // Filter by category
+  const categoryFilter = category && category !== "all" ? { category } : {};
+
+  // Filter by price
+  const priceFilter: Prisma.ProductWhereInput =
+    price && price !== "all"
+      ? {
+          price: {
+            gte: Number(price.split("-")[0]),
+            lte: Number(price.split("-")[1]),
+          },
+        }
+      : {};
+
+  // Filter by rating
+  const ratingFilter = rating && rating !== "all" ? { rating: { gte: Number(rating) } } : {};
+
+  // Fetch products
   const data = await prisma.product.findMany({
     orderBy: { createdAt: "desc" },
+    where: {
+      ...queryFilter,
+      ...categoryFilter,
+      ...priceFilter,
+      ...ratingFilter,
+    },
     skip: (page - 1) * limit,
     take: limit,
   });
