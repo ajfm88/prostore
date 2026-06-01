@@ -1,7 +1,10 @@
 import Pagination from "@/components/shared/pagination";
 import ProductCard from "@/components/shared/product/product-card";
 import { Button } from "@/components/ui/button";
-import { getAllCategories, getAllProducts } from "@/lib/actions/product.actions";
+import {
+  getAllCategories,
+  getAllProducts,
+} from "@/lib/actions/product.actions";
 import Link from "next/link";
 
 const SearchPage = async (props: {
@@ -23,7 +26,28 @@ const SearchPage = async (props: {
     page = "1",
   } = await props.searchParams;
 
-  console.log(q, category, price, rating, sort, page);
+  // Construct filter url
+  const getFilterUrl = ({
+    c,
+    s,
+    p,
+    r,
+    pg,
+  }: {
+    c?: string;
+    s?: string;
+    p?: string;
+    r?: string;
+    pg?: string;
+  }) => {
+    const params = { q, category, price, rating, sort, page };
+    if (c) params.category = c;
+    if (p) params.price = p;
+    if (r) params.rating = r;
+    if (pg) params.page = pg;
+    if (s) params.sort = s;
+    return `/search?${new URLSearchParams(params).toString()}`;
+  };
 
   // Get products
   const products = await getAllProducts({
@@ -45,7 +69,9 @@ const SearchPage = async (props: {
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
-        {products!.totalPages! > 1 && <Pagination page={page} totalPages={products!.totalPages} />}
+        {products!.totalPages! > 1 && (
+          <Pagination page={page} totalPages={products!.totalPages} />
+        )}
       </div>
     </div>
   );
