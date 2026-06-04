@@ -1,82 +1,75 @@
+# Add Sorting
 
-# Rating & Query Filter Links
+Now we are going to add the ability to sort the results. We have to edit both the action and the page component UI.
 
-Now we will add links to filter the ratings and query text.
+## Edit the action
 
-## Rating Links
+Let's start by editing the action. Open the `lib./actions/product.actions.ts` file and go to the `getAllProducts` method.
 
-Let's create an array of ratings right under the prices array.
+It already takes in a `sort` parameter. Change the following query:
 
 ```ts
-const ratings = [4, 3, 2, 1];
+// Fetch products
+const data = await prisma.product.findMany({
+  where: {
+    ...queryFilter,
+    ...categoryFilter,
+    ...priceFilter,
+    ...ratingFilter,
+  },
+  skip: (page - 1) * limit,
+  take: limit,
+});
 ```
 
-Now add the following right under the closing `</div>` of the price links. Make sure you are still within the `filter-links` div or the layout will not look right.
+To this:
 
-```tsx
-{
-  /* Rating Links */
-}
-<div>
-  <div className='text-xl mt-8 mb-2'>Customer Review</div>
-  <ul className='space-y-1'>
-    <li>
-      <Link
-        href={getFilterUrl({ r: 'all' })}
-        className={`  ${'all' === rating && 'font-bold'}`}
-      >
-        Any
-      </Link>
-    </li>
-    {ratings.map((r) => (
-      <li key={r}>
-        <Link
-          href={getFilterUrl({ r: `${r}` })}
-          className={`${r.toString() === rating && 'font-bold'}`}
-        >
-          {`${r} stars & up`}
-        </Link>
-      </li>
-    ))}
-  </ul>
-</div>;
+```ts
+const data = await prisma.product.findMany({
+  where: {
+    ...queryFilter,
+    ...categoryFilter,
+    ...ratingFilter,
+    ...priceFilter,
+  },
+  orderBy:
+    sort === 'lowest'
+      ? { price: 'asc' }
+      : sort === 'highest'
+      ? { price: 'desc' }
+      : sort === 'rating'
+      ? { rating: 'desc' }
+      : { createdAt: 'desc' },
+  skip: (page - 1) * limit,
+  take: limit,
+});
 ```
 
-We are doing the same thing, mapping through the ratings and creating a link for each one.
+We are adding a new `orderBy` parameter. We can sort by `price` or `rating` or `createdAt`.
 
-## Query Text
+## Edit The Search Page
 
-Right now we are stuck with whatever query we have in the URL. So let's show the query text along with the category, price, rating and a button to clear the filters.
+Now open the `app/(root)/search/page.tsx` file and add the following array at the top of the file with the other arrays:
 
-Find the div that wraps the right column:
-
-```tsx
-<div className="md:col-span-4 space-y-4">
+```ts
+const sortOrders = ['newest', 'lowest', 'highest', 'rating'];
 ```
 
-And add this inside of it:
+Now go to the comment "SORTING HERE" and replace it with the following code:
 
-```tsx
-<div className='flex-between flex-col md:flex-row my-4'>
-  <div className='flex items-center'>
-    {q !== 'all' && q !== '' && 'Query : ' + q}
-    {category !== 'all' && category !== '' && '   Category : ' + category}
-    {price !== 'all' && '    Price: ' + price}
-    {rating !== 'all' && '    Rating: ' + rating + ' & up'}
-    &nbsp;
-    {(q !== 'all' && q !== '') ||
-    (category !== 'all' && category !== '') ||
-    rating !== 'all' ||
-    price !== 'all' ? (
-      <Button variant={'link'} asChild>
-        <Link href='/search'>Clear</Link>
-      </Button>
-    ) : null}
-  </div>
-  <div>{/* SORTING HERE */}</div>
-</div>
+```ts
+Sort by{' '}
+{sortOrders.map((s) => (
+  <Link
+    key={s}
+    className={`mx-2   ${sort == s && 'font-bold'} `}
+    href={getFilterUrl({ s })}
+  >
+    {s}
+  </Link>
+))}
 ```
 
-First, we are checking if the query is not `all` and not empty. If it is not, we are showing the query text. Then we are checking if the category is not `all` and not empty. If it is not, we are showing the category text. Then we are checking if the price is not `all`. If it is not, we are showing the price text. Then we are checking if the rating is not `all`. If it is not, we are showing the rating text. Then we are checking if the query is not `all` and not empty or the category is not `all` and not empty or the rating is not `all` or the price is not `all`. If it is not, we are showing a button to clear the filters.
+We are mapping over the sortOrders array and creating a link for each one. We are also adding a class to the link if the sort is the same as the current sort.
 
-In the next lesson, we will add the sorting.
+You should now w be able to sort the results by price, rating, and createdAt.
