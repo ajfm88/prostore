@@ -1,75 +1,82 @@
-# Add Sorting
+# Dynamic Metadata
 
-Now we are going to add the ability to sort the results. We have to edit both the action and the page component UI.
+This is a nice touch to what we have so far. For the title, we can make it dynamic based on the filters.
 
-## Edit the action
+Remember, we can just export a function called `generateMetadata` from the page component adn add things like a title, description, etc.
 
-Let's start by editing the action. Open the `lib./actions/product.actions.ts` file and go to the `getAllProducts` method.
-
-It already takes in a `sort` parameter. Change the following query:
+So if we add the following function above the main `SearchPage` function in the `app/(root)/search/page.tsx` file:
 
 ```ts
-// Fetch products
-const data = await prisma.product.findMany({
-  where: {
-    ...queryFilter,
-    ...categoryFilter,
-    ...priceFilter,
-    ...ratingFilter,
-  },
-  skip: (page - 1) * limit,
-  take: limit,
-});
+export async function generateMetadata() {
+  return {
+    title: `Search`,
+  };
+}
 ```
 
-To this:
+It will add the title to the page.
+
+Let's make this very dynamic by taking in the search parameters and using them to create the title.
+
+Add the following searchParams to the function:
 
 ```ts
-const data = await prisma.product.findMany({
-  where: {
-    ...queryFilter,
-    ...categoryFilter,
-    ...ratingFilter,
-    ...priceFilter,
-  },
-  orderBy:
-    sort === 'lowest'
-      ? { price: 'asc' }
-      : sort === 'highest'
-      ? { price: 'desc' }
-      : sort === 'rating'
-      ? { rating: 'desc' }
-      : { createdAt: 'desc' },
-  skip: (page - 1) * limit,
-  take: limit,
-});
+export async function generateMetadata(props: {
+  searchParams: Promise<{
+    q: string;
+    category: string;
+    price: string;
+    rating: string;
+  }>;
+}) {
+  const {
+    q = 'all',
+    category = 'all',
+    price = 'all',
+    rating = 'all',
+  } = await props.searchParams;
+}
 ```
 
-We are adding a new `orderBy` parameter. We can sort by `price` or `rating` or `createdAt`.
-
-## Edit The Search Page
-
-Now open the `app/(root)/search/page.tsx` file and add the following array at the top of the file with the other arrays:
+Now we can add some conditional logic to the function and return the title based on the search parameters.
 
 ```ts
-const sortOrders = ['newest', 'lowest', 'highest', 'rating'];
+export async function generateMetadata(props: {
+  searchParams: Promise<{
+    q: string;
+    category: string;
+    price: string;
+    rating: string;
+  }>;
+}) {
+  const {
+    q = 'all',
+    category = 'all',
+    price = 'all',
+    rating = 'all',
+  } = await props.searchParams;
+
+  const isQuerySet = q && q !== 'all' && q.trim() !== '';
+  const isCategorySet = category && category !== 'all' && category.trim() !== '';
+  const isPriceSet = price && price !== 'all' && price.trim() !== '';
+  const isRatingSet = rating && rating !== 'all' && rating.trim() !== '';
+
+  if (isQuerySet || isCategorySet || isPriceSet || isRatingSet) {
+    return {
+      title: `Search ${
+        isQuerySet ? q : ''
+      }
+      ${isCategorySet ? `: Category ${category}` : ''}
+      ${isPriceSet ? `: Price ${price}` : ''}
+      ${isRatingSet ? `: Rating ${rating}` : ''}`,
+    };
+  } else {
+    return {
+      title: 'Search Products',
+    };
+  }
+}
+
 ```
 
-Now go to the comment "SORTING HERE" and replace it with the following code:
-
-```ts
-Sort by{' '}
-{sortOrders.map((s) => (
-  <Link
-    key={s}
-    className={`mx-2   ${sort == s && 'font-bold'} `}
-    href={getFilterUrl({ s })}
-  >
-    {s}
-  </Link>
-))}
-```
-
-We are mapping over the sortOrders array and creating a link for each one. We are also adding a class to the link if the sort is the same as the current sort.
-
-You should now w be able to sort the results by price, rating, and createdAt.
+We are checking for the query, category, price, and rating parameters and if they are not `all`, we are adding them to the title. If there are no filters, we are just returning the default title of `Search Products`.
