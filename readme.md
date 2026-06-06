@@ -1,82 +1,15 @@
-# Dynamic Metadata
+# Section Intro 
 
-This is a nice touch to what we have so far. For the title, we can make it dynamic based on the filters.
+Now we are going to add the rating and review functionality to the project.
 
-Remember, we can just export a function called `generateMetadata` from the page component adn add things like a title, description, etc.
+This includes creaing the Prisma model for reviews as well as the relationship with both the product ans user models and tables. We'll also have some Zod schemas for validation.
 
-So if we add the following function above the main `SearchPage` function in the `app/(root)/search/page.tsx` file:
+We'll create a review list component, which will utlimately show all reviews for that product.
 
-```ts
-export async function generateMetadata() {
-  return {
-    title: `Search`,
-  };
-}
-```
+We will also have a review form that will open in a dialog.
 
-It will add the title to the page.
+We will create an action to both create and update the review if the logged in user already reviewed the product.
 
-Let's make this very dynamic by taking in the search parameters and using them to create the title.
+Then we'll get the reviews to list on the page in the review list component.
 
-Add the following searchParams to the function:
-
-```ts
-export async function generateMetadata(props: {
-  searchParams: Promise<{
-    q: string;
-    category: string;
-    price: string;
-    rating: string;
-  }>;
-}) {
-  const {
-    q = 'all',
-    category = 'all',
-    price = 'all',
-    rating = 'all',
-  } = await props.searchParams;
-}
-```
-
-Now we can add some conditional logic to the function and return the title based on the search parameters.
-
-```ts
-export async function generateMetadata(props: {
-  searchParams: Promise<{
-    q: string;
-    category: string;
-    price: string;
-    rating: string;
-  }>;
-}) {
-  const {
-    q = 'all',
-    category = 'all',
-    price = 'all',
-    rating = 'all',
-  } = await props.searchParams;
-
-  const isQuerySet = q && q !== 'all' && q.trim() !== '';
-  const isCategorySet = category && category !== 'all' && category.trim() !== '';
-  const isPriceSet = price && price !== 'all' && price.trim() !== '';
-  const isRatingSet = rating && rating !== 'all' && rating.trim() !== '';
-
-  if (isQuerySet || isCategorySet || isPriceSet || isRatingSet) {
-    return {
-      title: `Search ${
-        isQuerySet ? q : ''
-      }
-      ${isCategorySet ? `: Category ${category}` : ''}
-      ${isPriceSet ? `: Price ${price}` : ''}
-      ${isRatingSet ? `: Rating ${rating}` : ''}`,
-    };
-  } else {
-    return {
-      title: 'Search Products',
-    };
-  }
-}
-
-```
-
-We are checking for the query, category, price, and rating parameters and if they are not `all`, we are adding them to the title. If there are no filters, we are just returning the default title of `Search Products`.
+We also want to pre-fill the form if there is an existing review and rating.
