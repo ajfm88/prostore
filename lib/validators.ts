@@ -30,7 +30,10 @@ export const updateProductSchema = insertProductSchema.extend({
 
 // Schema for signing in a user
 export const signInFormSchema = z.object({
-  email: z.string().email("Invalid email address").min(3, "Email must be at least 3 characters"),
+  email: z
+    .string()
+    .email("Invalid email address")
+    .min(3, "Email must be at least 3 characters"),
   password: z.string().min(3, "Password must be at least 3 characters"),
 });
 
@@ -40,7 +43,9 @@ export const signUpFormSchema = z
     name: z.string().min(3, "Name must be at least 3 characters"),
     email: z.string().min(3, "Email must be at least 3 characters"),
     password: z.string().min(3, "Password must be at least 3 characters"),
-    confirmPassword: z.string().min(3, "Confirm password must be at least 3 characters"),
+    confirmPassword: z
+      .string()
+      .min(3, "Confirm password must be at least 3 characters"),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -135,4 +140,17 @@ export const updateUserSchema = updateProfileSchema.extend({
   id: z.string().min(1, "Id is required"),
   name: z.string().min(3, "Name must be at least 3 characters"),
   role: z.string().min(1, "Role is required"),
+});
+
+// Insert Review Schema
+export const insertReviewSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters"),
+  description: z.string().min(3, "Description must be at least 3 characters"),
+  productId: z.string().min(1, "Product is required"),
+  userId: z.string().min(1, "User is required"),
+  rating: z.coerce
+    .number()
+    .int()
+    .min(1, "Rating must be at least 1")
+    .max(5, "Rating must be at most 5"),
 });
