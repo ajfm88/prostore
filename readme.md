@@ -1,117 +1,119 @@
-# Review Prisma Model, Zod & Type
+# Review List Component
 
-Now that we are going to be adding reviews and ratings to our products, we need to create a Prisma model for reviews.
+We have quite a bit of work to do here. We need to create components for the review list and the review form. We need actions to get and post reviews and so on.
 
-Open the `prisma/schema.prisma` file and add the following code:
+Let's start with the UI stuff first. I want to have a review-list component and in that we will display the reviews but we will also have a review-form component within the list component.
 
-```prisma
-model Review {
-  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId             String   @db.Uuid
-  productId          String   @db.Uuid
-  rating             Int
-  title              String
-  description        String
-  isVerifiedPurchase Boolean  @default(true)
-  createdAt          DateTime @default(now()) @db.Timestamp(6)
-  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "reviews_productId_product_id_fk")
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "reviews_userId_user_id_fk")
-}
+So create a new file at `app/(root)/product/[slug]/review-list.tsx` and add the following code:
+
+```tsx
+'use client';
+
+const ReviewList = ({
+  userId,
+  productId,
+  productSlug,
+}: {
+  userId: string;
+  productId: string;
+  productSlug: string;
+}) => {
+  console.log(userId, productId, productSlug);
+
+  return <>REVIEW LIST</>;
+};
+
+export default ReviewList;
 ```
 
-Here is a rundown of the fields:
+The component takes in the `userId`, `productId` and `productSlug` as props. We will use these to get the reviews for the product and to post reviews. For now, just log them out to the console.
 
-- `id`: This is the primary key for the review.
-- `userId`: This is the foreign key that references the user who wrote the review.
-- `productId`: This is the foreign key that references the product that the review is for.
-- `rating`: This is the rating that the user gave the product.
-- `title`: This is the title of the review.
-- `description`: This is the description of the review
-- `isVerifiedPurchase`: This is a boolean that indicates whether the user has verified their purchase of the product.
-- `createdAt`: This is the date and time that the review was created.
-- `product`: This is the relation that links the review to the product.
-- `user`: This is the relation that links the review to the user.
+We want to add this to the product page. So open the `app/(root)/product/[slug]/page.tsx` file and import the following:
 
-Make sure in your `User` and `Product` models that you have a `Review` field like this:
-
-```prisma
-model User {
-  //..
-   Review    Review[]
-}
-
-model Product {
-  //...
-  Review    Review[]
-}
+```tsx
+import { auth } from '@/auth';
+import ReviewList from './review-list';
 ```
 
-## Migration
+We need to get the user ID. So add the following above the return in the `ProductDetailsPage`:
 
-Now we need to run the migration to create the `Review` table in the database.
-
-Run the following commands:
-
-```bash
-npx prisma migrate dev --name add-review
-npx prisma generate
+```tsx
+const session = await auth();
+const userId = session?.user?.id;
 ```
 
-## Zod Schema
+Now under the closing `</section>` add the following section with the review list component:
 
-We are also going to need to create a Zod schema for inserting reviews.
-
-Open the `lib/validator.ts` file and add the following code:
-
-```ts
-// Insert Review Schema
-export const insertReviewSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
-  description: z.string().min(3, 'Description must be at least 3 characters'),
-  productId: z.string().min(1, 'Product is required'),
-  userId: z.string().min(1, 'User is required'),
-  rating: z.coerce
-    .number()
-    .int()
-    .min(1, 'Rating must be at least 1')
-    .max(5, 'Rating must be at most 5'),
-});
+```tsx
+<section className='mt-10'>
+  <h2 className='h2-bold  mb-5'>Customer Reviews</h2>
+  <ReviewList
+    productId={product.id}
+    productSlug={product.slug}
+    userId={userId || ''}
+  />
+</section>
 ```
 
-These are the fields and validation needed when we create a review.
+Now if you go to the product page, you should see the component text and the console.log output.
 
-## Type
+Let's bring in a few ShadCN components, icons and hooks into the `ReviewList` component:
 
-Now we need to create a type for the review and use the `zod` schema to validate the data.
-
-Open the `types/index.ts` file and add the following code:
-
-```ts
+```tsx
+import { useEffect, useState } from 'react';
+import { Review } from '@/types';
 import {
-  // ..
-  insertReviewSchema,
-} from '@/lib/validator';
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Calendar, Check, User } from 'lucide-react';
+import { formatDateTime } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
+```
 
-export type Review = z.infer<typeof insertReviewSchema> & {
-  id: string;
-  createdAt: Date;
-  user?: { name: string };
+Now let's just add an empty array in state to hold the reviews and then add the following to the return:
+
+```tsx
+const ReviewList = ({
+  userId,
+  productId,
+  productSlug,
+}: {
+  userId: string;
+  productId: string;
+  productSlug: string;
+}) => {
+  const [reviews, setReviews] = useState<Review[]>([]);
+
+  return (
+    <div className='space-y-4'>
+      {reviews.length === 0 && <div>No reviews yet</div>}
+      {userId ? (
+        <>{/* REVIEW FORM HERE */}</>
+      ) : (
+        <div>
+          Please{' '}
+          <Link
+            className='text-primary px-2'
+            href={`/api/auth/signin?callbackUrl=/product/${productSlug}`}
+          >
+            sign in
+          </Link>{' '}
+          to write a review
+        </div>
+      )}
+      <div className='flex flex-col gap-3'>{/* REVIEWS HERE */}</div>
+    </div>
+  );
 };
 ```
 
-We are using all the fields from the `insertReviewSchema` and adding the `id` and `createdAt` fields as well as the `user` field.
+We are just checking for reviews and if the user is logged in, we will show the review form. Otherwise, we will show a message to sign in to write a review. We use the `callbackUrl` to redirect the user to the product page after they sign in.
 
-## Default Values Constant
+Now you should just see the heading and no reviews message.
 
-Like with most of our forms, I am going to add a constant
-for the default values. Open the `lib/constants/index.ts` file and add the following code:
-
-```ts
-export const reviewFormDefaultValues = {
-  title: '',
-  comment: '',
-  rating: 0,
-};
-```
-
-In the next lesson, we will start to create the rating and review functionality.
+Let's continue with the form in the next lesson.
