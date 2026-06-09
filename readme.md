@@ -1,119 +1,196 @@
-# Review List Component
+# Display Review Form Dialog
 
-We have quite a bit of work to do here. We need to create components for the review list and the review form. We need actions to get and post reviews and so on.
-
-Let's start with the UI stuff first. I want to have a review-list component and in that we will display the reviews but we will also have a review-form component within the list component.
-
-So create a new file at `app/(root)/product/[slug]/review-list.tsx` and add the following code:
+I want to start on the review form before we actually try and fetch and display them because we need to actually have some reviews. So create a new file at `app/(root)/product/[slug]/review-form.tsx` and add the following code:
 
 ```tsx
 'use client';
 
-const ReviewList = ({
+const ReviewForm = ({
   userId,
   productId,
-  productSlug,
+  onReviewSubmitted,
 }: {
   userId: string;
   productId: string;
-  productSlug: string;
+  onReviewSubmitted?: () => void;
 }) => {
-  console.log(userId, productId, productSlug);
-
-  return <>REVIEW LIST</>;
+  return <>REVIEW FORM</>;
 };
 
-export default ReviewList;
+export default ReviewForm;
 ```
 
-The component takes in the `userId`, `productId` and `productSlug` as props. We will use these to get the reviews for the product and to post reviews. For now, just log them out to the console.
+This component will be used to create a new review for the product. It will take in the `userId`, `productId` and a callback function to call when the review is submitted.
+I made the callback function optional for now because we are not going to add it yet.
 
-We want to add this to the product page. So open the `app/(root)/product/[slug]/page.tsx` file and import the following:
+Let's add this to the review list component. Open the `app/(root)/product/[slug]/review-list.tsx` file and import the following:
 
 ```tsx
-import { auth } from '@/auth';
-import ReviewList from './review-list';
+import ReviewForm from './review-form';
 ```
 
-We need to get the user ID. So add the following above the return in the `ProductDetailsPage`:
+Now replace the comment with the component:
 
 ```tsx
-const session = await auth();
-const userId = session?.user?.id;
+<ReviewForm userId={userId} productId={productId} />
 ```
 
-Now under the closing `</section>` add the following section with the review list component:
+You should see the text from the review form component.
+
+Now we will add a bunch of imports to the top of the file:
 
 ```tsx
-<section className='mt-10'>
-  <h2 className='h2-bold  mb-5'>Customer Reviews</h2>
-  <ReviewList
-    productId={product.id}
-    productSlug={product.slug}
-    userId={userId || ''}
-  />
-</section>
-```
+'use client';
 
-Now if you go to the product page, you should see the component text and the console.log output.
-
-Let's bring in a few ShadCN components, icons and hooks into the `ReviewList` component:
-
-```tsx
-import { useEffect, useState } from 'react';
-import { Review } from '@/types';
+import { useState } from 'react';
+import { useForm, SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@/components/ui/button';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Calendar, Check, User } from 'lucide-react';
-import { formatDateTime } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
-import Link from 'next/link';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
+import {
+  createUpdateReview,
+  getReviewByProductId,
+} from '@/lib/actions/review.actions';
+import { reviewFormDefaultValues } from '@/lib/constants';
+import { insertReviewSchema } from '@/lib/validator';
+import { z } from 'zod';
+import { StarIcon } from 'lucide-react';
+import { reviewFormDefaultValues } from '@/lib/constants';
+
+type CustomerReview = z.infer<typeof insertReviewSchema>;
 ```
 
-Now let's just add an empty array in state to hold the reviews and then add the following to the return:
+We have a bunch of ShadCN components, hooks, icons, zod schema, etc.
+
+Let's add some code above the return:
 
 ```tsx
-const ReviewList = ({
-  userId,
-  productId,
-  productSlug,
-}: {
-  userId: string;
-  productId: string;
-  productSlug: string;
-}) => {
-  const [reviews, setReviews] = useState<Review[]>([]);
+const [open, setOpen] = useState(false);
 
-  return (
-    <div className='space-y-4'>
-      {reviews.length === 0 && <div>No reviews yet</div>}
-      {userId ? (
-        <>{/* REVIEW FORM HERE */}</>
-      ) : (
-        <div>
-          Please{' '}
-          <Link
-            className='text-primary px-2'
-            href={`/api/auth/signin?callbackUrl=/product/${productSlug}`}
-          >
-            sign in
-          </Link>{' '}
-          to write a review
-        </div>
-      )}
-      <div className='flex flex-col gap-3'>{/* REVIEWS HERE */}</div>
-    </div>
-  );
-};
+const { toast } = useToast();
+
+const form = useForm<CustomerReview>({
+  resolver: zodResolver(insertReviewSchema),
+  defaultValues: reviewFormDefaultValues,
+});
 ```
 
-We are just checking for reviews and if the user is logged in, we will show the review form. Otherwise, we will show a message to sign in to write a review. We use the `callbackUrl` to redirect the user to the product page after they sign in.
+We are setting a state for the dialog to be open or closed. We are also getting the toast from the `useToast` hook. We are also creating a form with the `useForm` hook. We are also setting the resolver to the `insertReviewSchema` schema and the default values to the `reviewFormDefaultValues` constant.
 
-Now you should just see the heading and no reviews message.
+Now let's create the dialog in the return:
 
-Let's continue with the form in the next lesson.
+```tsx
+return (
+  <Dialog open={open} onOpenChange={setOpen}>
+    <Button onClick={handleOpenForm} variant='default'>
+      Write a review
+    </Button>
+    <DialogContent className='sm:max-w-[425px]'>
+      <Form {...form}>
+        <form method='post'>
+          <DialogHeader>
+            <DialogTitle>Write a review</DialogTitle>
+            <DialogDescription>
+              Share your thoughts with other customers
+            </DialogDescription>
+          </DialogHeader>
+          <div className='grid gap-4 py-4'>
+            <FormField
+              control={form.control}
+              name='title'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder='Enter title' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='description'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder='Enter description' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='rating'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rating</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value.toString()}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder='Select a rating' />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <SelectItem key={index} value={(index + 1).toString()}>
+                          {index + 1} <StarIcon className='inline h-4 w-4' />
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type='submit'
+              size='lg'
+              className='w-full'
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? 'Submitting...' : 'Submit'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Form>
+    </DialogContent>
+  </Dialog>
+);
+```
+
+We have a title, description, rating, and a submit button. We are using a mix of ShadCN and React Hook Form components to create the form.
+
+When you click the button, the dialog will open. In the next lesson, we will start to add the logic to submit the form.
