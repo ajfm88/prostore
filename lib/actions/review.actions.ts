@@ -1,28 +1,19 @@
-# Create Update Review Action
+"use server";
 
-Now that we have our form dialog, we need an action to submit the form to. Create a new file at `lib/actions/review.actions.ts` and add the following imports:
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { auth } from "@/auth";
+import { formatError } from "../utils";
+import { insertReviewSchema } from "../validators";
+import { prisma } from "@/db/prisma";
 
-```ts
-'use server';
-
-import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
-import { auth } from '@/auth';
-import { formatError } from '../utils';
-import { insertReviewSchema } from '../validator';
-import { prisma } from '@/db/prisma';
-```
-
-Now add the following action:
-
-```ts
 // Create & Update Review
 export async function createUpdateReview(
-  data: z.infer<typeof insertReviewSchema>
+  data: z.infer<typeof insertReviewSchema>,
 ) {
   try {
     const session = await auth();
-    if (!session) throw new Error('User is not authenticated');
+    if (!session) throw new Error("User is not authenticated");
 
     // Validate and store review data and userId
     const review = insertReviewSchema.parse({
@@ -35,7 +26,7 @@ export async function createUpdateReview(
       where: { id: review.productId },
     });
 
-    if (!product) throw new Error('Product not found');
+    if (!product) throw new Error("Product not found");
 
     // Check if user has already reviewed this product
     const reviewExists = await prisma.review.findFirst({
@@ -87,7 +78,7 @@ export async function createUpdateReview(
 
     return {
       success: true,
-      message: 'Review updated successfully',
+      message: "Review updated successfully",
     };
   } catch (error) {
     return {
@@ -96,8 +87,3 @@ export async function createUpdateReview(
     };
   }
 }
-```
-
-This is quite a bit of code, but it's very straightforward. We first validate the data using the `insertReviewSchema` and then check if the user has already reviewed the product. If they have, we update the review, otherwise we create a new one. We then get the average rating and number of reviews for the product and update the product's rating and number of reviews.
-
-In the next lesson, we will connect our form to this action.
