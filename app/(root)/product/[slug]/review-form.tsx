@@ -60,7 +60,29 @@ const ReviewForm = ({
   });
 
   const handleOpenForm = () => {
+    form.setValue("productId", productId);
+    form.setValue("userId", userId);
+
     setOpen(true);
+  };
+
+  // Form submit handler
+  const onSubmit: SubmitHandler<CustomerReview> = async (values) => {
+    const res = await createUpdateReview({ ...values, productId });
+
+    if (!res.success)
+      return toast({
+        variant: "destructive",
+        description: res.message,
+      });
+
+    setOpen(false);
+
+    onReviewSubmitted();
+
+    toast({
+      description: res.message,
+    });
   };
 
   return (
@@ -70,7 +92,7 @@ const ReviewForm = ({
       </Button>
       <DialogContent className="sm:max-w-[425px]">
         <Form {...form}>
-          <form method="post">
+          <form method="post" onSubmit={form.handleSubmit(onSubmit)}>
             <DialogHeader>
               <DialogTitle>Write a review</DialogTitle>
               <DialogDescription>

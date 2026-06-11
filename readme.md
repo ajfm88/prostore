@@ -1,103 +1,84 @@
-# Create Update Review Action
+# Connect Review Form to Action
 
-Now that we have our form dialog, we need an action to submit the form to. Create a new file at `lib/actions/review.actions.ts` and add the following imports:
+Now we have our form in the UI and we have the action to create or update a review. Let's connect the two.
 
-```ts
-'use server';
-
-import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
-import { auth } from '@/auth';
-import { formatError } from '../utils';
-import { insertReviewSchema } from '../validator';
-import { prisma } from '@/db/prisma';
-```
-
-Now add the following action:
+Open the `app/(root)/product/[slug]/review-form.tsx` file and import the action:
 
 ```ts
-// Create & Update Review
-export async function createUpdateReview(
-  data: z.infer<typeof insertReviewSchema>
-) {
-  try {
-    const session = await auth();
-    if (!session) throw new Error('User is not authenticated');
-
-    // Validate and store review data and userId
-    const review = insertReviewSchema.parse({
-      ...data,
-      userId: session?.user.id,
-    });
-
-    // Get the product being reviewed
-    const product = await prisma.product.findFirst({
-      where: { id: review.productId },
-    });
-
-    if (!product) throw new Error('Product not found');
-
-    // Check if user has already reviewed this product
-    const reviewExists = await prisma.review.findFirst({
-      where: {
-        productId: review.productId,
-        userId: review.userId,
-      },
-    });
-
-    // If review exists, update it, otherwise create a new one
-    await prisma.$transaction(async (tx) => {
-      if (reviewExists) {
-        // Update the review
-        await tx.review.update({
-          where: { id: reviewExists.id },
-          data: {
-            description: review.description,
-            title: review.title,
-            rating: review.rating,
-          },
-        });
-      } else {
-        // Create a new review
-        await tx.review.create({ data: review });
-      }
-
-      // Get the average rating
-      const averageRating = await tx.review.aggregate({
-        _avg: { rating: true },
-        where: { productId: review.productId },
-      });
-
-      // Get the number of reviews
-      const numReviews = await tx.review.count({
-        where: { productId: review.productId },
-      });
-
-      // Update rating and  number of reviews
-      await tx.product.update({
-        where: { id: review.productId },
-        data: {
-          rating: averageRating._avg.rating || 0,
-          numReviews: numReviews,
-        },
-      });
-    });
-
-    revalidatePath(`/product/${product.slug}`);
-
-    return {
-      success: true,
-      message: 'Review updated successfully',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: formatError(error),
-    };
-  }
-}
+import { createUpdateReview } from '@/lib/actions/review.actions';
 ```
 
-This is quite a bit of code, but it's very straightforward. We first validate the data using the `insertReviewSchema` and then check if the user has already reviewed the product. If they have, we update the review, otherwise we create a new one. We then get the average rating and number of reviews for the product and update the product's rating and number of reviews.
+## Create Form Submit Handler
 
-In the next lesson, we will connect our form to this action.
+Create the submit handler for the form:
+
+```ts
+// Form submit handler
+const onSubmit: SubmitHandler<CustomerReview> = async (values) => {
+  const res = await createUpdateReview({ ...values, productId });
+
+  if (!res.success)
+    return toast({
+      variant: 'destructive',
+      description: res.message,
+    });
+
+  setOpen(false);
+
+  onReviewSubmitted();
+
+  toast({
+    description: res.message,
+  });
+};
+```
+
+We are passing the productId and the values to the action. We are also setting the open state to false and calling the onReviewSubmitted function, which is passed into the form component. We are also showing a toast message with the response from the action.
+
+Remove the `?` from the `onReviewSubmitted?` parameter in the form component.
+
+## Set User & Product ID
+
+In the `handleOpenForm` function, we need to add the following:
+
+```ts
+const handleOpenForm = () => {
+  form.setValue('productId', productId);
+  form.setValue('userId', userId);
+
+  setOpen(true);
+};
+```
+
+The form inputs only take care of the title, description and rating, but our validator needs the user and product ID. We set it when the form opens here.
+
+## Add Handler To Form
+
+Add the following to the form tag:
+
+```tsx
+  <form method="post" onSubmit={form.handleSubmit(onSubmit)}>
+```
+
+## Pass in the callback to the `<ReviewForm />` component
+
+Open the `app/(root)/product/[slug]/review-list.tsx` file and pass in the following props to the `<ReviewForm />` component:
+
+```tsx
+<ReviewForm userId={userId} productId={productId} onReviewSubmitted={reload} />
+```
+
+So when we submit the form the `onReviewSubmitted` function is called and the `reload` function is called. This will update the reviews list. For now, just add a console log.
+
+Create the `reload` function in the `review-list.tsx` file right above the return statement:
+
+```tsx
+// Reload reviews when a review is submitted
+const reload = async () => {
+  console.log('review submitted');
+};
+```
+
+Okay, we should be able to submit a review now. Go ahead and give it a try. Add a title, description, and rating.
+
+Now go to Prisma Studio and check the reviews table. You should see the review you just added.
