@@ -59,10 +59,18 @@ const ReviewForm = ({
     defaultValues: reviewFormDefaultValues,
   });
 
-  const handleOpenForm = () => {
+  // Open dialog on button click
+  const handleOpenForm = async () => {
     form.setValue("productId", productId);
     form.setValue("userId", userId);
 
+    const review = await getReviewByProductId({ productId });
+
+    if (review) {
+      form.setValue("title", review.title);
+      form.setValue("description", review.description);
+      form.setValue("rating", review.rating);
+    }
     setOpen(true);
   };
 
