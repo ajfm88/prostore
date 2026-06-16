@@ -86,7 +86,7 @@ const ReviewForm = ({
 
     setOpen(false);
 
-    onReviewSubmitted();
+    onReviewSubmitted?.();
 
     toast({
       description: res.message,

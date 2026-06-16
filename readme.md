@@ -1,63 +1,15 @@
-# Update & Reload Reviews
+# Section Intro
 
-Now we need to make it so that if the user already has a review, it will show in the form and the user can update it. We also want to reload the reviews so that the user can see the added or updated review.
+In this section we are going to add Stripe Payments to our application. It's nice to give your users a few options to pay.
 
-Open the `app/(root)/product/[slug]/review-form.tsx` file and import the `getReviewByProductId` action:
+We first need to setup our Sripe account to use test mode. That's as simple as flipping a switch. We also need to get our api keys and add them to both the .env and the Vercel platform environment variables.
 
-```tsx
-import {
-  createUpdateReview,
-  getReviewByProductId,
-} from '@/lib/actions/review.actions';
-```
+We then need to create what is called a payment intent. This is a core concept in Stripe's API that represents a specific transaction for collecting payment from a customer. The Sripe API gives us the methods that we need for this. So we will be installing a few NPM packages to work with Stripe.
 
-Now, in the `handleOpenForm` function, add the following:
+We then need to create the payment and form component. This will show the credit card and expiration inputs on the order details page. Stripe also gives us a fake credit card to work with to test things.
 
-```tsx
-// Open dialog on button click
-const handleOpenForm = async () => {
-  form.setValue('productId', productId);
-  form.setValue('userId', userId);
+Then we need to create a payment success page.
 
-  const review = await getReviewByProductId({ productId });
+The last thing we need to do is create a webook, which is tells one service when something from another service happens. We need to notify our app when a payment succeeds. They we can mark it in our database that it was paid. It's important to know that thos webhook will be for our live site. Because it needs to be able to make a request to our project and it can't do that to our localhost.
 
-  if (review) {
-    form.setValue('title', review.title);
-    form.setValue('description', review.description);
-    form.setValue('rating', review.rating);
-  }
-  setOpen(true);
-};
-```
-
-We are setting the productId and userId in the form, then we are getting the review by productId and if it exists, we are setting the form values to the review values.
-
-You should see the data in the form if you already have a review for that product.
-
-## Reload Reviews
-
-Now go to the `app/(root)/product/[slug]/review-list.tsx` file and add the following to the `reload()` function:
-
-```tsx
-// Reload reviews when a review is submitted
-const reload = async () => {
-  try {
-    const res = await getReviews({ productId });
-    setReviews([...res.data]);
-  } catch (err) {
-    console.log(err);
-    toast({
-      variant: 'destructive',
-      description: 'Error in fetching reviews',
-    });
-  }
-};
-```
-
-You will also need to initialize the `toast`. Add this under the state:
-
-```tsx
-const { toast } = useToast();
-```
-
-Now try and edit or add a review and you should see the reviews reload.
+Alright, let's get started with Sripe.
