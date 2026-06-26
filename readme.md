@@ -1,15 +1,41 @@
-# Section Intro
+# Stripe Setup
 
-In this section we are going to add Stripe Payments to our application. It's nice to give your users a few options to pay.
+In order to use Stripe, you need to create an account. I have an account that I use for my real projects, but I created a dev account for tutorials and courses.
 
-We first need to setup our Sripe account to use test mode. That's as simple as flipping a switch. We also need to get our api keys and add them to both the .env and the Vercel platform environment variables.
+Log in or create an account here: https://dashboard.stripe.com/register
 
-We then need to create what is called a payment intent. This is a core concept in Stripe's API that represents a specific transaction for collecting payment from a customer. The Sripe API gives us the methods that we need for this. So we will be installing a few NPM packages to work with Stripe.
+Once you are logged in, you will see the dashboard.
 
-We then need to create the payment and form component. This will show the credit card and expiration inputs on the order details page. Stripe also gives us a fake credit card to work with to test things.
+Make sure that the Test Mode switch is on. This is important because you don't want to use your real credit card information or real payments.
 
-Then we need to create a payment success page.
+One you are ready to go live, then you would switch this off and you need to go through and add your business info and bank account information.
 
-The last thing we need to do is create a webook, which is tells one service when something from another service happens. We need to notify our app when a payment succeeds. They we can mark it in our database that it was paid. It's important to know that thos webhook will be for our live site. Because it needs to be able to make a request to our project and it can't do that to our localhost.
+Click on the "Developers" link next to the test mode switch. Then click the "API Keys" tab. You want to add your key to the `.env` file.
 
-Alright, let's get started with Sripe.
+Copy the secret key and add it to the file. It should look something like this:
+
+```
+STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+You also need to add the publishable key to the `.env` file. It should look something like this:
+
+```
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Be sure to add the `NEXT_PUBLIC_` prefix to the key.
+
+## Install The Stripe Package
+
+We need to install the Stripe NPM package and the package that integrates Stripe with React. Open a terminal and run the following command:
+
+```bash
+npm install stripe @stripe/stripe-js @stripe/react-stripe-js
+```
+
+The `@stripe/stripe-js` package is a JavaScript library that provides a set of APIs for interacting with Stripe's payment processing services.
+
+The `@stripe/react-stripe-js` package is an official Stripe library that provides a set of React components and hooks to make it easier to integrate Stripe's payment elements in your React application. It's designed to work with Stripe’s Elements API, which is a UI library for creating custom payment forms.
+
+Now that we have Stripe setup in test mode and we have the packages that we need, we can start building the Stripe payment form.
