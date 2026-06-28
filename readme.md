@@ -1,41 +1,142 @@
-# Stripe Setup
+# Update Order Form
 
-In order to use Stripe, you need to create an account. I have an account that I use for my real projects, but I created a dev account for tutorials and courses.
+Before we create the actual Stripe form, we need to update the order form and include something called payment intent and the client secret, which I'll go over in a minute.
 
-Log in or create an account here: https://dashboard.stripe.com/register
+Open the `app/(root)/order/[id]/page.tsx` file and add the following import:
 
-Once you are logged in, you will see the dashboard.
-
-Make sure that the Test Mode switch is on. This is important because you don't want to use your real credit card information or real payments.
-
-One you are ready to go live, then you would switch this off and you need to go through and add your business info and bank account information.
-
-Click on the "Developers" link next to the test mode switch. Then click the "API Keys" tab. You want to add your key to the `.env` file.
-
-Copy the secret key and add it to the file. It should look something like this:
-
-```
-STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```tsx
+import Stripe from 'stripe';
 ```
 
-You also need to add the publishable key to the `.env` file. It should look something like this:
+In the `OrderDetailsPage` component, right under the `session` variable, add the following:
 
+```tsx
+let client_secret = null;
+
+// Check if using Stripe and not paid
+if (order.paymentMethod === 'Stripe' && !order.isPaid) {
+  // Initialize Stripe instance
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+  // Create a new payment intent
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: Math.round(Number(order.totalPrice) * 100),
+    currency: 'USD',
+    metadata: { orderId: order.id },
+  });
+  client_secret = paymentIntent.client_secret;
+}
 ```
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+We are just setting the `client_secret` variable null for now.
+
+Then we are checking to see if the payment method is Stripe and if the order is not paid. If it is, we are creating a new Stripe payment intent.
+
+### What Is a Payment Intent?
+
+A Payment Intent is a core concept in Stripe's API that represents a specific transaction for collecting payment from a customer. It’s a record of an attempt to collect money, containing all the information to complete a payment, track its status, and handle any required authentication.
+
+Here are the steps involved in creating a Payment Intent:
+
+1. **Create a payment intent**: This is the initial step where you define the details of the payment, such as the amount, currency, and any additional metadata.
+2. **Confirm the payment on the Client**: Using Stripe’s JavaScript SDK (like @stripe/react-stripe-js), the front-end uses the client_secret to confirm the payment.
+3. ** Check payment status**: Stripe processes the payment and updates the payment intent status. The Payment Intent’s status updates throughout the process, providing real-time insights. The status could be:
+
+- **Requires Payment Method**: If no payment method has been attached.
+- **Requires Confirmation**: If the payment needs confirmation (e.g., from the client).
+- **Requires Action**: If additional steps like 3D Secure are needed.
+- **Processing**: If the payment is in progress.
+- **Succeeded**: If the payment is complete.
+- **Canceled or Failed**: If the payment did not succeed or was canceled.
+
+4. **Handle Payment Success or Failure**: Upon confirmation, if the payment is successful, the Payment Intent’s status will update to succeeded. Your backend can use webhooks (like listening for the payment_intent.succeeded event) to trigger further actions, such as sending order confirmation emails, updating the order status, or providing access to digital goods. We're going to do this as well.
+
+Back to our code, the `stripe.paymentIntents.create` method takes in an object with the following properties:
+
+- `amount`: The amount to be charged in the smallest currency unit. For example, $10.00 would be 1000 (1000 cents).
+- `currency`: The currency in which the payment will be made.
+- `metadata`: Additional information about the payment, such as the order ID.
+
+Then we are setting the `client_secret` variable to the `paymentIntent.client_secret` property.
+
+Now we want to pass the `client_secret` variable to the `OrderDetailsPage` component just like we did the PayPal client ID.
+
+```tsx
+<OrderDetailsTable
+  order={{
+    ...order,
+    shippingAddress: order.shippingAddress as ShippingAddress,
+  }}
+  stripeClientSecret={client_secret}
+  paypalClientId={process.env.PAYPAL_CLIENT_ID || 'sb'}
+  isAdmin={session?.user.role === 'admin' || false}
+/>
 ```
 
-Be sure to add the `NEXT_PUBLIC_` prefix to the key.
+Now we need to update the `OrderDetailsTable` component to include the Stripe payment form. Open the `app/(root)/order/[id]/order-details-table.tsx` file and take in the new prop:
 
-## Install The Stripe Package
-
-We need to install the Stripe NPM package and the package that integrates Stripe with React. Open a terminal and run the following command:
-
-```bash
-npm install stripe @stripe/stripe-js @stripe/react-stripe-js
+```tsx
+const OrderDetailsTable = ({
+  order,
+  paypalClientId,
+  isAdmin,
+  stripeClientSecret,
+}: {
+  order: Order;
+  paypalClientId: string;
+  isAdmin: boolean;
+  stripeClientSecret: string | null;
+}) => {};
 ```
 
-The `@stripe/stripe-js` package is a JavaScript library that provides a set of APIs for interacting with Stripe's payment processing services.
+## Create a Stripe Payment Component
 
-The `@stripe/react-stripe-js` package is an official Stripe library that provides a set of React components and hooks to make it easier to integrate Stripe's payment elements in your React application. It's designed to work with Stripe’s Elements API, which is a UI library for creating custom payment forms.
+We need to create a new component to handle the Stripe payment form. For now, we will just create it as a placeholder.
 
-Now that we have Stripe setup in test mode and we have the packages that we need, we can start building the Stripe payment form.
+Create a new file called `stripe-payment.tsx` in the `app/(root)/order/[id]` directory and add the following code:
+
+```tsx
+const StripePayment = ({
+  priceInCents,
+  orderId,
+  clientSecret,
+}: {
+  priceInCents: number;
+  orderId: string;
+  clientSecret: string;
+}) => {
+  return <>STRIPE FORM</>;
+};
+
+export default StripePayment;
+```
+
+It takes in the `priceInCents`, `orderId`, and `clientSecret` as props. Stripe uses the lowest denomination of a currency for simplicity. For example, $10.00 would be 1000 (1000 cents).
+
+Now, back in the `OrderDetailsTable` component, we can import the `StripePayment` component and use it in the `Stripe` payment method.
+
+```tsx
+import StripePayment from './stripe-payment';
+```
+
+In the return, add the following right under where we check for paypal and use the `<PayPalScriptProvider>` component:`
+
+```tsx
+{
+  /* Stripe Payment */
+}
+{
+  !isPaid && paymentMethod === 'Stripe' && stripeClientSecret && (
+    <StripePayment
+      priceInCents={Number(order.totalPrice) * 100}
+      orderId={order.id}
+      clientSecret={stripeClientSecret}
+    />
+  );
+}
+```
+
+We are passing in the priceInCents by multiplying the total price by 100. We are also passing in the `orderId` and `clientSecret` as props.
+
+Now add something to the cart, go through the process and select Stripe as the payment method. Place the order and you should see the text `STRIPE FORM` in the browser.
+
+In the next lesson, we wil create the actual Stripe form.
