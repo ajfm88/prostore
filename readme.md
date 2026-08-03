@@ -1,34 +1,98 @@
-# Resend Account and API Key
+# Resend Main Function
 
-We are going to use a service called Resend to send email. Resend is a developer-focused service designed to simplify the process of sending emails. It provides a simple API for sending emails, making it easy to integrate into your applications.
+We need to now create our email template for the purchase receipt, but first, we need to setup the main function that sends the email. We will use the `resend` for this and the `react-email` packages to create our email template.
 
-The first thing you need to do is create an account. You can go to [Resend](https://resend.com/) and click on the "Sign Up" button. Or you can do what I did and just use your GitHub account.
+If you go to this link: [https://www.npmjs.com/package/resend](https://www.npmjs.com/package/resend) you will see how to use the `resend` package to send emails. We simply import the `resend` package and then call the `resend.emails.send` method with the properties of `to`, `from`, `subject`, etc. Since we are using React, we can set a property called `react` and pass in our email template.
 
-Once you log in you will see the dashboard. Click on "Add API Key" and copy it and then paste it into your `.env` file. You also want to add the sender email address. Ultimately, you want to set this to an email that you own the domain but for testing, you can actually use `onboarding@resend.dev` and it will work.
+So let's create a new file in the root of our project at `email/index.tsx`. Don't add it to the `app` folder because we don't want it to be a page.
 
-It should look something like this:
+Add the following code for now:
 
-```
-RESEND_API_KEY="your key here"
-SENDER_EMAIL="onboarding@resend.dev"
-```
+```tsx
+import { Resend } from 'resend';
+import { SENDER_EMAIL, APP_NAME } from '@/lib/constants';
+import { Order } from '@/types';
 
-You also need to add these variables to Vercel for the production environment. Go to settings->Environment Variables and add the same variables.
+const resend = new Resend(process.env.RESEND_API_KEY as string);
 
-Let's also add the sender email to our constants file. Add the following to `app/constants/index.ts`:
-
-```ts
-export const SENDER_EMAIL = process.env.SENDER_EMAIL || "onboarding@resend.dev";
-```
-
-## Install Packages
-
-We are going to install a few packages to send emails. Open a terminal and run the following command:
-
-```bash
-npm install resend react-email @react-email/components
+export const sendPurchaseReceipt = async ({ order }: { order: Order }) => {
+  await resend.emails.send({
+    from: `${APP_NAME} <${SENDER_EMAIL}>`,
+    to: order.user.email,
+    subject: `Order Confirmation ${order.id}`,
+    react: <>EMAIL COMPONENT</>,
+  });
+};
 ```
 
-The `resend` package is the official Node.js SDK for Resend. It provides a simple API for sending emails. The `react-email` package is a library for creating email templates in React. The `@react-email/components` package is a set of pre-built components for creating email templates.
+We are just creating a new instance of the `Resend` class and calling the `emails.send` method. We are passing in the properties of `from`, `to`, `subject`, and `react`. The `react` property is where we will pass in our email template.
 
-That's it for now. In the next lesson, we will create our email purchase receipt.
+NOTE: While in development, you can only send emails to your own email address so just make sure when you test, you create a prostore account with the same email address that you used to register for Resend.
+
+Let's create a file at `email/purchase-receipt.tsx`. This is where we will create our email template.
+
+Add the following imports and type:
+
+```tsx
+import {
+  Body,
+  Column,
+  Container,
+  Head,
+  Heading,
+  Html,
+  Img,
+  Preview,
+  Row,
+  Section,
+  Tailwind,
+  Text,
+} from '@react-email/components';
+import { formatCurrency } from '@/lib/utils';
+import { Order } from '@/types';
+import sampleData from '@/db/sample-data';
+require('dotenv').config();
+
+type OrderInformationProps = {
+  order: Order;
+};
+
+const dateFormatter = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
+
+export default function PurchaseReceiptEmail({ order }: {order: Order}) {
+  return (
+    <Html>
+
+    </Html>
+}
+```
+
+We are bringing in a bunch of components from the `@react-email/components` package. We are also bringing in the `formatCurrency` function from our `lib/utils` file. We are also bringing in the `Order` type from our `types` file. We are also bringing in the `sampleData` object from our `db/sample-data` file. This is because I'm going to use sample data to preview the email.
+
+Since we are using environment variables outside of the main app folder, we need to require the `dotenv` package and call the `config` method.
+
+We also create a `dateFormatter` object to format the date.
+
+
+## Apply the Email Template
+
+Now back in the `email/index.tsx` file, we need to apply the `PurchaseReceiptEmail` component to the `send` function.
+
+Import it like this:
+
+```tsx
+import PurchaseReceiptEmail from './purchase-receipt';
+```
+
+Then pass it into the `react` property with the order as a prop:
+
+```tsx
+await resend.emails.send({
+  from: `${APP_NAME} <${SENDER_EMAIL}>`,
+  to: order.user.email,
+  subject: `Order Confirmation ${order.id}`,
+  react: <PurchaseReceiptEmail order={order} />, 👈 Add this line
+});
+```
+
+In the next lesson, we will create the template with React Email.
