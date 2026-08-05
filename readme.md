@@ -1,93 +1,114 @@
-# Receipt Email Template
+# Preview Email In Browser
 
+We are going to add some preview props to our email template so that we can preview it in the browser.
 
-Now we will create the email template using the components from React Email. Open the `email/purchase-receipt.tsx` file and add the following to the return:
+Open the `email/purchase-receipt.tsx` file and import the `db/sample-data.ts` file if you have not done so already.
 
 ```tsx
-export default function PurchaseReceiptEmail({ order }: {order: Order}) {
-  return (
-    <Html>
-      <Preview>View order receipt</Preview>
-      <Tailwind>
-        <Head />
-        <Body className='font-sans bg-white'>
-          <Container className='max-w-xl'>
-            <Heading>Purchase Receipt</Heading>
-            <Section>
-              <Row>
-                <Column>
-                  <Text className='mb-0 text-gray-500 whitespace-nowrap text-nowrap mr-4'>
-                    Order ID
-                  </Text>
-                  <Text className='mt-0 mr-4'>{order.id.toString()}</Text>
-                </Column>
-                <Column>
-                  <Text className='mb-0 text-gray-500 whitespace-nowrap text-nowrap mr-4'>
-                    Purchased On
-                  </Text>
-                  <Text className='mt-0 mr-4'>
-                    {dateFormatter.format(order.createdAt)}
-                  </Text>
-                </Column>
-                <Column>
-                  <Text className='mb-0 text-gray-500 whitespace-nowrap text-nowrap mr-4'>
-                    Price Paid
-                  </Text>
-                  <Text className='mt-0 mr-4'>
-                    {formatCurrency(order.totalPrice)}
-                  </Text>
-                </Column>
-              </Row>
-            </Section>
-            <Section className='border border-solid border-gray-500 rounded-lg p-4 md:p-6 my-4'>
-              {order.orderItems.map((item) => (
-                <Row key={item.productId} className='mt-8'>
-                  <Column className='w-20'>
-                    <Img
-                      width='80'
-                      alt={item.name}
-                      className='rounded'
-                      src={
-                        item.image.startsWith('/')
-                          ? `${process.env.NEXT_PUBLIC_SERVER_URL}${item.image}`
-                          : item.image
-                      }
-                    />
-                  </Column>
-                  <Column className='align-top'>
-                    <Text className='mx-2 my-0'>
-                      {item.name} x {item.qty}
-                    </Text>
-                  </Column>
-                  <Column align='right' className='align-top'>
-                    <Text className='m-0 '>{formatCurrency(item.price)}</Text>
-                  </Column>
-                </Row>
-              ))}
-              {[
-                { name: 'Items', price: order.itemsPrice },
-                { name: 'Tax', price: order.taxPrice },
-                { name: 'Shipping', price: order.shippingPrice },
-                { name: 'Total', price: order.totalPrice },
-              ].map(({ name, price }) => (
-                <Row key={name} className='py-1'>
-                  <Column align='right'>{name}:</Column>
-                  <Column align='right' width={70} className='align-top'>
-                    <Text className='m-0'>{formatCurrency(price)}</Text>
-                  </Column>
-                </Row>
-              ))}
-            </Section>
-          </Container>
-        </Body>
-      </Tailwind>
-    </Html>
-  );
-}
+import sampleData from '@/db/sample-data';
 ```
 
-In this template, we used the `Tailwind` component to apply Tailwind CSS classes to our email. We are also using the `Row` and `Column` components to layout our email. We are also using the `Img` component to display an image. We are also using the `formatCurrency` function to format the price.
+Add the following code right above the `dateFormatter` variable:
 
-We get the order items and map over them to display a row for each item. We are also displaying the total price of the order. For the image, we are checking if the image is a relative path or an absolute path. If it is a relative path, we are adding the `process.env.NEXT_PUBLIC_SERVER_URL` to the path.
+```tsx
+PurchaseReceiptEmail.PreviewProps = {
+  order: {
+    id: crypto.randomUUID(),
+    userId: '123',
+    user: {
+      name: 'John Doe',
+      email: 'bS8Rn@example.com',
+    },
+    paymentMethod: 'Stripe',
+    shippingAddress: {
+      fullName: 'John Doe',
+      streetAddress: '123 Main St',
+      city: 'New York',
+      postalCode: '10001',
+      country: 'US',
+    },
+    createdAt: new Date(),
+    totalPrice: '100',
+    taxPrice: '10',
+    shippingPrice: '10',
+    itemsPrice: '80',
+    orderItems: sampleData.products.map((x) => ({
+      name: x.name,
+      orderId: '123',
+      productId: '123',
+      slug: x.slug,
+      qty: x.stock,
+      image: x.images[0],
+      price: x.price,
+    })),
+    isDelivered: true,
+    deliveredAt: new Date(),
+    isPaid: true,
+    paidAt: new Date(),
+    paymentResult: {
+      id: '123',
+      status: 'succeeded',
+      pricePaid: '12',
+      email_address: 'bS8Rn@example.com',
+    },
+  },
+} satisfies OrderInformationProps;
+```
 
-In the next lesson, we are going to add some preview props to our email template so that we can preview it in the browser.
+We are using the sample data from the `sample-data.ts` file to create a fake order.
+
+You will probably see a red line for the `paymentResult` property. To fix this, open the `types/index.ts` file and add the `paymentResult` property to the `Order` type:
+
+```ts
+export type Order = z.infer<typeof insertOrderSchema> & {
+  id: string;
+  createdAt: Date;
+  isPaid: Boolean;
+  paidAt: Date | null;
+  isDelivered: Boolean;
+  deliveredAt: Date | null;
+  orderItems: OrderItem[];
+  user: { name: string; email: string };
+  paymentResult: PaymentResult; // 👈 Add this line
+};
+```
+
+You may have a red line in the `app/(root)/order/[id]/page.tsx` file. Where we embed the `<OrderDetailsTable  />` component. That is because added PaymentResult to the `Order` type that this component is using. So we can just open the component file, which is `app/(root)/order/[id]/order-details-table.tsx` and change this line:
+
+```tsx
+order: Order;
+```
+
+To this line:
+
+```tsx
+order: Omit<Order, 'paymentResult'>;
+```
+
+We are just omitting the `paymentResult` property from the `Order` type. Yes TypeScript can be a pain in the ass 😉
+
+## Add NPM Script
+
+We are going to add a script to our `package.json` file to send the email.
+
+Open the `package.json` file and add the following script:
+
+```json
+ "email": "cp .env ./node_modules/react-email && email dev --dir email --port 3001"
+```
+
+Let's break down what this script does:
+
+- `cp .env ./node_modules/react-email`: This copies the `.env` file to the `node_modules/react-email` directory. This is because the `react-email` package uses the `.env` file to get the `RESEND_API_KEY` and `SENDER_EMAIL` variables.
+
+- `email dev --dir email --port 3001`: This starts the `email` package in development mode and opens the email in the browser.
+
+Let's run the script:
+
+```bash
+npm run email
+```
+
+Now if you go to `http://localhost:3001` you should see the email in the browser. This is what your email will look like.
+
+In the next lesson, we will send the email.

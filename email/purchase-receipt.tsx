@@ -14,8 +14,51 @@ import {
 } from "@react-email/components";
 import { formatCurrency } from "@/lib/utils";
 import { Order } from "@/types";
-import sampleData from "@/db/sample-data";
 import "dotenv/config";
+import sampleData from "@/db/sample-data";
+
+PurchaseReceiptEmail.PreviewProps = {
+  order: {
+    id: '00000000-0000-0000-0000-000000000000',
+    userId: "123",
+    user: {
+      name: "John Doe",
+      email: "bS8Rn@example.com",
+    },
+    paymentMethod: "Stripe",
+    shippingAddress: {
+      fullName: "John Doe",
+      streetAddress: "123 Main St",
+      city: "New York",
+      postalCode: "10001",
+      country: "US",
+    },
+    createdAt: new Date(),
+    totalPrice: "100",
+    taxPrice: "10",
+    shippingPrice: "10",
+    itemsPrice: "80",
+    orderitems: sampleData.products.map((x) => ({
+      name: x.name,
+      orderId: "123",
+      productId: "123",
+      slug: x.slug,
+      qty: x.stock,
+      image: x.images[0],
+      price: x.price.toString(),
+    })),
+    isDelivered: true,
+    deliveredAt: new Date(),
+    isPaid: true,
+    paidAt: new Date(),
+    paymentResult: {
+      id: "123",
+      status: "succeeded",
+      pricePaid: "12",
+      email_address: "bS8Rn@example.com",
+    },
+  },
+} satisfies OrderInformationProps;
 
 type OrderInformationProps = {
   order: Order;
@@ -59,7 +102,7 @@ export default function PurchaseReceiptEmail({ order }: { order: Order }) {
               </Row>
             </Section>
             <Section className="border border-solid border-gray-500 rounded-lg p-4 md:p-6 my-4">
-              {order.orderItems.map((item) => (
+              {order.orderitems.map((item) => (
                 <Row key={item.productId} className="mt-8">
                   <Column className="w-20">
                     <Img
