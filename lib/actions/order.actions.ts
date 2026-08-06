@@ -8,11 +8,12 @@ import { getUserById } from "./user.actions";
 import { insertOrderSchema } from "../validators";
 import { prisma } from "@/db/prisma";
 import { Prisma } from "@/lib/generated/prisma";
-import { CartItem, PaymentResult } from "@/types";
+import { CartItem, PaymentResult, ShippingAddress } from "@/types";
 import { convertToPlainObject } from "../utils";
 import { revalidatePath } from "next/cache";
 import { paypal } from "../paypal";
 import { PAGE_SIZE } from "../constants";
+import { sendPurchaseReceipt } from "@/email";
 
 // Create an order
 export async function createOrder() {
@@ -27,7 +28,11 @@ export async function createOrder() {
     const user = await getUserById(userId);
 
     if (!cart || cart.items.length === 0) {
-      return { success: false, message: "Your cart is empty", redirectTo: "/cart" };
+      return {
+        success: false,
+        message: "Your cart is empty",
+        redirectTo: "/cart",
+      };
     }
     if (!user.address) {
       return {
@@ -149,7 +154,10 @@ export async function createPayPalOrder(orderId: string) {
 }
 
 // Approve PayPal order and update order to paid
-export async function approvePayPalOrder(orderId: string, data: { orderID: string }) {
+export async function approvePayPalOrder(
+  orderId: string,
+  data: { orderID: string },
+) {
   try {
     // Find the order in the database
     const order = await prisma.order.findFirst({
@@ -175,7 +183,8 @@ export async function approvePayPalOrder(orderId: string, data: { orderID: strin
         id: captureData.id,
         status: captureData.status,
         email_address: captureData.payer.email_address,
-        pricePaid: captureData.purchase_units[0]?.payments?.captures[0]?.amount?.value,
+        pricePaid:
+          captureData.purchase_units[0]?.payments?.captures[0]?.amount?.value,
       },
     });
 
@@ -247,10 +256,25 @@ export async function updateOrderToPaid({
   if (!updatedOrder) {
     throw new Error("Order not found");
   }
+
+  // Send the purchase receipt email with the updated order
+  sendPurchaseReceipt({
+    order: {
+      ...updatedOrder,
+      shippingAddress: updatedOrder.shippingAddress as ShippingAddress,
+      paymentResult: updatedOrder.paymentResult as PaymentResult,
+    },
+  });
 }
 
 // Get User Orders
-export async function getMyOrders({ limit = PAGE_SIZE, page }: { limit?: number; page: number }) {
+export async function getMyOrders({
+  limit = PAGE_SIZE,
+  page,
+}: {
+  limit?: number;
+  page: number;
+}) {
   const session = await auth();
   if (!session) throw new Error("User is not authenticated");
 
