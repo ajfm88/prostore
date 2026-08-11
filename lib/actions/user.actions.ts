@@ -1,27 +1,29 @@
 "use server";
 
-import { auth, signIn, signOut as signOutAuth } from "@/auth";
 import {
+  shippingAddressSchema,
   signInFormSchema,
   signUpFormSchema,
-  shippingAddressSchema,
   paymentMethodSchema,
   updateUserSchema,
 } from "../validators";
-import { revalidatePath } from "next/cache";
-import { isRedirectError } from "next/dist/client/components/redirect-error";
-import { hashSync } from "bcrypt-ts-edge";
+import { auth, signIn, signOut } from "@/auth";
+import { isRedirectError } from "next/dist/client/components/redirect";
+import { hash } from "../encrypt";
 import { prisma } from "@/db/prisma";
-import { Prisma } from "@/lib/generated/prisma";
 import { formatError } from "../utils";
 import { ShippingAddress } from "@/types";
 import { z } from "zod";
 import { PAGE_SIZE } from "../constants";
+import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 // Sign in the user with credentials
-export async function signInWithCredentials(prevState: unknown, formData: FormData) {
+export async function signInWithCredentials(
+  prevState: unknown,
+  formData: FormData,
+) {
   try {
-    // Set user from form and validate it with Zod schema
     const user = signInFormSchema.parse({
       email: formData.get("email"),
       password: formData.get("password"),
@@ -38,13 +40,13 @@ export async function signInWithCredentials(prevState: unknown, formData: FormDa
   }
 }
 
-// Sign the user out
-export async function signOut() {
-  await signOutAuth();
+// Sign user out
+export async function signOutUser() {
+  await signOut();
 }
 
-// Register a new user
-export async function signUp(prevState: unknown, formData: FormData) {
+// Sign up user
+export async function signUpUser(prevState: unknown, formData: FormData) {
   try {
     const user = signUpFormSchema.parse({
       name: formData.get("name"),
@@ -55,7 +57,7 @@ export async function signUp(prevState: unknown, formData: FormData) {
 
     const plainPassword = user.password;
 
-    user.password = hashSync(user.password, 10);
+    user.password = await hash(user.password);
 
     await prisma.user.create({
       data: {
@@ -70,37 +72,31 @@ export async function signUp(prevState: unknown, formData: FormData) {
       password: plainPassword,
     });
 
-    return { success: true, message: "User created successfully" };
+    return { success: true, message: "User registered successfully" };
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
-
-    return {
-      success: false,
-      message: formatError(error),
-    };
+    return { success: false, message: formatError(error) };
   }
 }
 
-// Get user by ID
+// Get user by the ID
 export async function getUserById(userId: string) {
   const user = await prisma.user.findFirst({
     where: { id: userId },
   });
-
   if (!user) throw new Error("User not found");
-
   return user;
 }
 
-// Update user's address
+// Update the user's address
 export async function updateUserAddress(data: ShippingAddress) {
   try {
     const session = await auth();
 
     const currentUser = await prisma.user.findFirst({
-      where: { id: session?.user?.id! },
+      where: { id: session?.user?.id },
     });
 
     if (!currentUser) throw new Error("User not found");
@@ -122,12 +118,15 @@ export async function updateUserAddress(data: ShippingAddress) {
 }
 
 // Update user's payment method
-export async function updateUserPaymentMethod(data: z.infer<typeof paymentMethodSchema>) {
+export async function updateUserPaymentMethod(
+  data: z.infer<typeof paymentMethodSchema>,
+) {
   try {
     const session = await auth();
     const currentUser = await prisma.user.findFirst({
-      where: { id: session!.user!.id! },
+      where: { id: session?.user?.id },
     });
+
     if (!currentUser) throw new Error("User not found");
 
     const paymentMethod = paymentMethodSchema.parse(data);
@@ -146,7 +145,7 @@ export async function updateUserPaymentMethod(data: z.infer<typeof paymentMethod
   }
 }
 
-// Update User Profile
+// Update the user profile
 export async function updateProfile(user: { name: string; email: string }) {
   try {
     const session = await auth();
@@ -177,7 +176,7 @@ export async function updateProfile(user: { name: string; email: string }) {
   }
 }
 
-// Get all users
+// Get all the users
 export async function getAllUsers({
   limit = PAGE_SIZE,
   page,
@@ -214,7 +213,7 @@ export async function getAllUsers({
   };
 }
 
-// Delete user by ID
+// Delete a user
 export async function deleteUser(id: string) {
   try {
     await prisma.user.delete({ where: { id } });
@@ -226,11 +225,14 @@ export async function deleteUser(id: string) {
       message: "User deleted successfully",
     };
   } catch (error) {
-    return { success: false, message: formatError(error) };
+    return {
+      success: false,
+      message: formatError(error),
+    };
   }
 }
 
-// Update user
+// Update a user
 export async function updateUser(user: z.infer<typeof updateUserSchema>) {
   try {
     await prisma.user.update({

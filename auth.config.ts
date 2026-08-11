@@ -2,18 +2,10 @@ import type { NextAuthConfig } from "next-auth";
 import { NextResponse } from "next/server";
 
 export const authConfig = {
-  pages: {
-    signIn: "/sign-in",
-    error: "/sign-in",
-  },
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
-  },
-  providers: [],
+  providers: [], // Required by NextAuthConfig type
   callbacks: {
     authorized({ request, auth }: any) {
-      // Array of regex patterns of protected paths
+      // Array of regex patterns of paths we want to protect
       const protectedPaths = [
         /\/shipping-address/,
         /\/payment-method/,
@@ -27,32 +19,28 @@ export const authConfig = {
       // Get pathname from the req URL object
       const { pathname } = request.nextUrl;
 
-      // Check if user is not authenticated and on a protected path
+      // Check if user is not authenticated and accessing a protected path
       if (!auth && protectedPaths.some((p) => p.test(pathname))) return false;
 
-      // Check for cart cookie
+      // Check for session cart cookie
       if (!request.cookies.get("sessionCartId")) {
-        // Generate cart cookie
+        // Generate new session cart id cookie
         const sessionCartId = crypto.randomUUID();
 
-        // Clone the request headers
-        const newRequestHeaders = new Headers(request.headers);
-
-        // Create a new response and add the new headers
+        // Create new response and add the new headers
         const response = NextResponse.next({
           request: {
-            headers: newRequestHeaders,
+            headers: new Headers(request.headers),
           },
         });
 
-        // Set the newly generated sessionCartId in the response cookies
+        // Set newly generated sessionCartId in the response cookies
         response.cookies.set("sessionCartId", sessionCartId);
 
-        // Return the response with the sessionCartId set
         return response;
-      } else {
-        return true;
       }
+
+      return true;
     },
   },
 } satisfies NextAuthConfig;
