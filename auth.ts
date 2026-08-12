@@ -1,10 +1,11 @@
 import NextAuth from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/db/prisma";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { compare } from "./lib/encrypt";
 import { authConfig } from "./auth.config";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import type { Adapter } from "next-auth/adapters";
+import { prisma } from "@/db/prisma";
 import { cookies } from "next/headers";
+import { compare } from "./lib/encrypt";
+import CredentialsProvider from "next-auth/providers/credentials";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
@@ -15,7 +16,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     strategy: "jwt" as const,
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  adapter: PrismaAdapter(prisma),
+  // `@auth/prisma-adapter` pins its own copy of `@auth/core`, so its Adapter
+  // type is a structurally-distinct duplicate of the one `next-auth` uses.
+  adapter: PrismaAdapter(prisma) as Adapter,
   providers: [
     CredentialsProvider({
       credentials: {
@@ -56,9 +59,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async session({ session, user, trigger, token }: any) {
+    async session({ session, user, trigger, token }) {
       // Set the user ID from the token
-      session.user.id = token.sub;
+      session.user.id = token.sub as string;
       session.user.role = token.role;
       session.user.name = token.name;
 
@@ -69,7 +72,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       return session;
     },
-    async jwt({ token, user, trigger, session }: any) {
+    async jwt({ token, user, trigger, session }) {
       // Assign user fields to token
       if (user) {
         token.id = user.id;

@@ -1,6 +1,3 @@
-import { deleteOrder, getAllOrders } from "@/lib/actions/order.actions";
-import { Metadata } from "next";
-import { requireAdmin } from "@/lib/auth-guard";
 import {
   Table,
   TableBody,
@@ -9,11 +6,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { deleteOrder, getAllOrders } from "@/lib/actions/order.actions";
+import { formatCurrency, formatDateTime, formatId } from "@/lib/utils";
+import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { formatCurrency, formatDateTime, formatId } from "@/lib/utils";
 import Pagination from "@/components/shared/pagination";
 import DeleteDialog from "@/components/shared/delete-dialog";
+import { requireAdmin } from "@/lib/auth-guard";
 
 export const metadata: Metadata = {
   title: "Admin Orders",
@@ -22,8 +22,9 @@ export const metadata: Metadata = {
 const AdminOrdersPage = async (props: {
   searchParams: Promise<{ page: string; query: string }>;
 }) => {
-  await requireAdmin();
   const { page = "1", query: searchText } = await props.searchParams;
+
+  await requireAdmin();
 
   const orders = await getAllOrders({
     page: Number(page),
@@ -37,7 +38,7 @@ const AdminOrdersPage = async (props: {
         {searchText && (
           <div>
             Filtered by <i>&quot;{searchText}&quot;</i>{" "}
-            <Link href={`/admin/orders`}>
+            <Link href="/admin/orders">
               <Button variant="outline" size="sm">
                 Remove Filter
               </Button>
@@ -62,9 +63,11 @@ const AdminOrdersPage = async (props: {
             {orders.data.map((order) => (
               <TableRow key={order.id}>
                 <TableCell>{formatId(order.id)}</TableCell>
-                <TableCell>{formatDateTime(order.createdAt).dateTime}</TableCell>
+                <TableCell>
+                  {formatDateTime(order.createdAt).dateTime}
+                </TableCell>
                 <TableCell>{order.user.name}</TableCell>
-                <TableCell>{formatCurrency(order.totalPrice.toString())}</TableCell>
+                <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
                 <TableCell>
                   {order.isPaid && order.paidAt
                     ? formatDateTime(order.paidAt).dateTime
@@ -86,7 +89,10 @@ const AdminOrdersPage = async (props: {
           </TableBody>
         </Table>
         {orders.totalPages > 1 && (
-          <Pagination page={Number(page) || 1} totalPages={orders?.totalPages} />
+          <Pagination
+            page={Number(page) || 1}
+            totalPages={orders?.totalPages}
+          />
         )}
       </div>
     </div>

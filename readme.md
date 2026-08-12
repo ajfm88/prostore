@@ -1,132 +1,86 @@
-# Vercel Hobby Tier Fix
+# Admin Route Guard
 
-If you are using the free "hobby" tier for Vercel, you may at some point get the following error:
+Right now, any user can access the admin screens by typing the URL in the browser. We need to add a route guard to protect the admin screens from unauthorized users.
 
-```
-Error: The Edge Function "middleware" size is 1.01 MB and your plan size limit is 1 MB. Learn More: https://vercel.link/edge-function-size
-```
+Create a new file at `app/lib/auth-guard.ts` and add the following code:
 
-I had made a post to try and fix this by swapping out bcrypt for a custom password encrypt script, but it turns out that wasn't the best fix and didn't work in some cases. If you already did that, that's absolutely fine, but it's not needed.
+```tsx
+import { auth } from '@/auth';
+import { redirect } from 'next/navigation';
 
-We can address the issue by splitting the `auth.ts` file into two files as mentioned in the [this section of the Next.js Docs](https://authjs.dev/guides/edge-compatibility#split-config)
+export async function requireAdmin() {
+  const session = await auth();
 
-## Why This Works
+  if (session?.user?.role !== 'admin') {
+    redirect('/unauthorized');
+  }
 
-By moving the authorized callback and configuration logic into a separate file (auth.config.ts), you reduce the size of the Edge Function code that Vercel processes. This modular approach not only solves the size limit issue but also makes your codebase cleaner and easier to maintain.
-
-## Create The Config File
-
-Let's create a new file in the root called `auth.config.ts`
-
-```bash
-touch auth.config.ts
+  return session;
+}
 ```
 
-Add the following imports:
+We are just checking if the user is an admin and redirecting to the unauthorized page if they are not.
 
-```ts
-import type { NextAuthConfig } from 'next-auth';
-import { NextResponse } from 'next/server';
+## Create Unauthrorized Page
+
+Now let's create the unauthorized page. Create a file at `app/unauthorized/page.tsx` and add the following:
+
+```tsx
+import { Button } from '@/components/ui/button';
+import { Metadata } from 'next';
+import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Unauthorized Access',
+};
+
+export default function UnauthorizedPage() {
+  return (
+    <div className='container mx-auto flex h-[calc(100vh-200px)] flex-col items-center justify-center space-y-4'>
+      <h1 className='h1-bold text-4xl'>Unauthorized Access</h1>
+      <p className='text-muted-foreground'>
+        You do not have permission to access this page.
+      </p>
+      <Button asChild>
+        <Link href='/'>Return Home</Link>
+      </Button>
+    </div>
+  );
+}
 ```
 
-Now create a new config object called `authConfig` and add the `authorized` function like so:
+## Protect Admin Routes
 
-```ts
-export const authConfig = {
-  providers: [], // Required by NextAuthConfig type
-  callbacks: {
-    authorized({ request, auth }: any) {
-      // Array of regex patterns of paths we want to protect
-      const protectedPaths = [
-        /\/shipping-address/,
-        /\/payment-method/,
-        /\/place-order/,
-        /\/profile/,
-        /\/user\/(.*)/,
-        /\/order\/(.*)/,
-        /\/admin/,
-      ];
+Now we need to bring in the `requireAdmin` function and use it to protect the admin routes. You may be tempted to use it in the admin layout rather than the individual pages, however, it isn't recommended. When you first go to the page it runs and renders the entire page but if you go to another admin page, you're essentially just fetching a server component and not getting a hard refresh with a new HTML page and the layout will not re-render.
 
-      // Get pathname from the req URL object
-      const { pathname } = request.nextUrl;
+So what we're going to do is use the `requireAdmin` function in each admin page to protect it. You just need to require it and call it at the top of the function.
 
-      // Check if user is not authenticated and accessing a protected path
-      if (!auth && protectedPaths.some((p) => p.test(pathname))) return false;
+Open `app/admin/users/page.tsx` and add the following:
 
-      // Check for session cart cookie
-      if (!request.cookies.get('sessionCartId')) {
-        // Generate new session cart id cookie
-        const sessionCartId = crypto.randomUUID();
-
-        // Create new response and add the new headers
-        const response = NextResponse.next({
-          request: {
-            headers: new Headers(request.headers),
-          },
-        });
-
-        // Set newly generated sessionCartId in the response cookies
-        response.cookies.set('sessionCartId', sessionCartId);
-
-        return response;
-      }
-
-      return true;
-    },
-  },
-} satisfies NextAuthConfig;
+```tsx
+import { requireAdmin } from '@/lib/auth-guard';
 ```
 
-## Edit `auth.ts`
+Then call the function at the top of the function:
 
-Now, in the `auth.ts` file, remove the 2 imports:
-
-```ts
-import type { NextAuthConfig } from 'next-auth';
-import { NextResponse } from 'next/server';
+```tsx
+const AdminUserPage = async (props: {
+  searchParams: Promise<{
+    page: string;
+    query: string;
+  }>;
+}) => {
+  await requireAdmin(); // Add this line
+  // ...
+};
 ```
 
-and add the following import:
+You want to do the same for the following pages and be sure to make any of them that are not `async` into `async` functions:
 
-```ts
-import { authConfig } from './auth.config';
-```
-
-Remove the `authorized` callback and instead, add this to the `callbacks` object:
-
-```ts
-...authConfig.callbacks,
-```
-
-You can also remove the following because we use it in the config file:
-
-```ts
-satisfies NextAuthConfig;
-```
-
-We also want to specify the "jwt" value for the session.strategy as a literal rather than a regular string. So add `as const` to it like this:
-
-```ts
- session: {
-    strategy: 'jwt' as const,
-  },
-```
-
-This is because this value has to be one of 3 values ("jwt" | "database" | undefined) and we want to make sure it's always "jwt" and not a string that could be anything. Here, strategy is no longer inferred as string; it is inferred as the literal type "jwt". If you don't add this, you will get an error for for the `config` we pass into `NextAuth` at the end of the file.
-
-## Update the `middleware` Function
-
-The last thing we need to do is update the `middleware.ts` file to the following:
-
-```ts
-import NextAuth from 'next-auth';
-import { authConfig } from './auth.config';
-
-export const { auth: middleware } = NextAuth(authConfig);
-```
-
-This will now use the `auth.config.ts` file for the configuration and the `auth.ts` file for the `middleware` function.
-
-## Deploy To Vercel
-
-Now try and push to Vercel and you should no longer get the error about the Edge Function size being too large.
+- `app/admin/users/page.tsx`
+- `app/admin/users/[id]/page.tsx`
+- `app/admin/products/page.tsx`
+- `app/admin/products/[id]/page.tsx`
+- `app/admin/products/create/page.tsx`
+- `app/admin/orders/page.tsx`
+- `app/admin/overview/page.tsx`

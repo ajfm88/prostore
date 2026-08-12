@@ -1,9 +1,3 @@
-import { auth } from "@/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getOrderSummary } from "@/lib/actions/order.actions";
-import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
-import { BadgeDollarSign, Barcode, CreditCard, Users } from "lucide-react";
-import { Metadata } from "next";
 import {
   Table,
   TableBody,
@@ -12,6 +6,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getOrderSummary } from "@/lib/actions/order.actions";
+import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
+import { BadgeDollarSign, Barcode, CreditCard, Users } from "lucide-react";
+import { Metadata } from "next";
 import Link from "next/link";
 import Charts from "./charts";
 import { requireAdmin } from "@/lib/auth-guard";
@@ -22,12 +21,7 @@ export const metadata: Metadata = {
 
 const AdminOverviewPage = async () => {
   await requireAdmin();
-  const session = await auth();
 
-  // Make sure the user is an admin
-  if (session?.user.role !== "admin") throw new Error("admin permission required");
-
-  // Get order summary
   const summary = await getOrderSummary();
 
   return (
@@ -41,7 +35,9 @@ const AdminOverviewPage = async () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(summary.totalSales._sum.totalPrice!.toString())}
+              {formatCurrency(
+                summary.totalSales._sum.totalPrice?.toString() || 0,
+              )}
             </div>
           </CardContent>
         </Card>
@@ -51,7 +47,9 @@ const AdminOverviewPage = async () => {
             <CreditCard />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(summary.ordersCount)}</div>
+            <div className="text-2xl font-bold">
+              {formatNumber(summary.ordersCount)}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -60,7 +58,9 @@ const AdminOverviewPage = async () => {
             <Users />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary.usersCount}</div>
+            <div className="text-2xl font-bold">
+              {formatNumber(summary.usersCount)}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -69,7 +69,9 @@ const AdminOverviewPage = async () => {
             <Barcode />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary.productsCount}</div>
+            <div className="text-2xl font-bold">
+              {formatNumber(summary.productsCount)}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -78,7 +80,7 @@ const AdminOverviewPage = async () => {
           <CardHeader>
             <CardTitle>Overview</CardTitle>
           </CardHeader>
-          <CardContent className="pl-2">
+          <CardContent>
             <Charts
               data={{
                 salesData: summary.salesData,
@@ -103,8 +105,12 @@ const AdminOverviewPage = async () => {
               <TableBody>
                 {summary.latestOrders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell>{order.user?.name ? order.user.name : "Deleted user"}</TableCell>
-                    <TableCell>{formatDateTime(order.createdAt).dateOnly}</TableCell>
+                    <TableCell>
+                      {order?.user?.name ? order.user.name : "Deleted User"}
+                    </TableCell>
+                    <TableCell>
+                      {formatDateTime(order.createdAt).dateOnly}
+                    </TableCell>
                     <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
                     <TableCell>
                       <Link href={`/order/${order.id}`}>
