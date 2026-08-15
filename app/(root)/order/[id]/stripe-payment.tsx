@@ -1,6 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { SERVER_URL } from "@/lib/constants";
-import { formatCurrency } from "@/lib/utils";
+import { FormEvent, useState } from "react";
+import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
   LinkAuthenticationElement,
@@ -8,9 +7,10 @@ import {
   useElements,
   useStripe,
 } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js/pure";
 import { useTheme } from "next-themes";
-import { FormEvent, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/utils";
+import { SERVER_URL } from "@/lib/constants";
 
 const StripePayment = ({
   priceInCents,
@@ -49,11 +49,11 @@ const StripePayment = ({
         })
         .then(({ error }) => {
           if (
-            error.type === "card_error" ||
-            error.type === "validation_error"
+            error?.type === "card_error" ||
+            error?.type === "validation_error"
           ) {
-            setErrorMessage(error.message);
-          } else {
+            setErrorMessage(error?.message ?? "An unknown error occurred");
+          } else if (error) {
             setErrorMessage("An unknown error occurred");
           }
         })

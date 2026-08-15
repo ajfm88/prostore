@@ -134,7 +134,7 @@ export async function createPayPalOrder(orderId: string) {
             id: paypalOrder.id,
             email_address: "",
             status: "",
-            pricePaid: "0",
+            pricePaid: 0,
           },
         },
       });
