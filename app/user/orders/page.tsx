@@ -16,13 +16,14 @@ export const metadata: Metadata = {
   title: "My Orders",
 };
 
-const OrdersPage = async (props: { searchParams: Promise<{ page: string }> }) => {
+export default async function OrdersPage(props: {
+  searchParams: Promise<{ page: string }>;
+}) {
   const { page } = await props.searchParams;
+
   const orders = await getMyOrders({
     page: Number(page) || 1,
   });
-
-  console.log(orders);
 
   return (
     <div className="space-y-2">
@@ -43,17 +44,21 @@ const OrdersPage = async (props: { searchParams: Promise<{ page: string }> }) =>
             {orders.data.map((order) => (
               <TableRow key={order.id}>
                 <TableCell>{formatId(order.id)}</TableCell>
-                <TableCell>{formatDateTime(order.createdAt).dateTime}</TableCell>
-                <TableCell>{formatCurrency(order.totalPrice.toString())}</TableCell>
+                <TableCell>
+                  {formatDateTime(order.createdAt).dateTime}
+                </TableCell>
+                <TableCell>
+                  {formatCurrency(order.totalPrice.toString())}
+                </TableCell>
                 <TableCell>
                   {order.isPaid && order.paidAt
                     ? formatDateTime(order.paidAt).dateTime
-                    : "not paid"}
+                    : "Not Paid"}
                 </TableCell>
                 <TableCell>
                   {order.isDelivered && order.deliveredAt
                     ? formatDateTime(order.deliveredAt).dateTime
-                    : "not delivered"}
+                    : "Not Delivered"}
                 </TableCell>
                 <TableCell>
                   <Link href={`/order/${order.id}`}>
@@ -65,11 +70,12 @@ const OrdersPage = async (props: { searchParams: Promise<{ page: string }> }) =>
           </TableBody>
         </Table>
         {orders.totalPages > 1 && (
-          <Pagination page={Number(page) || 1} totalPages={orders?.totalPages} />
+          <Pagination
+            page={Number(page) || 1}
+            totalPages={orders?.totalPages}
+          />
         )}
       </div>
     </div>
   );
-};
-
-export default OrdersPage;
+}
