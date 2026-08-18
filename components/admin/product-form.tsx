@@ -1,5 +1,18 @@
 "use client";
 
+import { useToast } from "@/hooks/use-toast";
+import { productDefaultValues } from "@/lib/constants";
+import { insertProductSchema, updateProductSchema } from "@/lib/validators";
+import { Product } from "@/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
+import {
+  ControllerRenderProps,
+  Resolver,
+  SubmitHandler,
+  useForm,
+} from "react-hook-form";
+import { z } from "zod";
 import {
   Form,
   FormControl,
@@ -8,24 +21,15 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { createProduct, updateProduct } from "@/lib/actions/product.actions";
-import { productDefaultValues } from "@/lib/constants";
-import { insertProductSchema, updateProductSchema } from "@/lib/validators";
-import { ControllerRenderProps, Resolver, useForm } from "react-hook-form";
-import { Product } from "@/types";
-import { zodResolver } from "@hookform/resolvers/zod";
 import slugify from "slugify";
-import { useRouter } from "next/navigation";
-import { z } from "zod";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { createProduct, updateProduct } from "@/lib/actions/product.actions";
+import { UploadButton } from "@/lib/uploadthing";
 import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { SubmitHandler } from "react-hook-form";
-import { UploadButton } from "@/lib/uploadthing";
 
 const ProductForm = ({
   type,
@@ -42,12 +46,17 @@ const ProductForm = ({
   const form = useForm<z.infer<typeof insertProductSchema>>({
     resolver: (type === "Update"
       ? zodResolver(updateProductSchema)
-      : zodResolver(insertProductSchema)) as Resolver<z.infer<typeof insertProductSchema>>,
-    defaultValues: product && type === "Update" ? product : productDefaultValues,
+      : zodResolver(insertProductSchema)) as Resolver<
+      z.infer<typeof insertProductSchema>
+    >,
+    defaultValues:
+      product && type === "Update" ? product : productDefaultValues,
   });
 
-  // Handle form submit
-  const onSubmit: SubmitHandler<z.infer<typeof insertProductSchema>> = async (values) => {
+  const onSubmit: SubmitHandler<z.infer<typeof insertProductSchema>> = async (
+    values,
+  ) => {
+    // On Create
     if (type === "Create") {
       const res = await createProduct(values);
 
@@ -60,12 +69,14 @@ const ProductForm = ({
         toast({
           description: res.message,
         });
-        router.push(`/admin/products`);
+        router.push("/admin/products");
       }
     }
+
+    // On Update
     if (type === "Update") {
       if (!productId) {
-        router.push(`/admin/products`);
+        router.push("/admin/products");
         return;
       }
 
@@ -77,7 +88,10 @@ const ProductForm = ({
           description: res.message,
         });
       } else {
-        router.push(`/admin/products`);
+        toast({
+          description: res.message,
+        });
+        router.push("/admin/products");
       }
     }
   };
@@ -88,8 +102,12 @@ const ProductForm = ({
 
   return (
     <Form {...form}>
-      <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <div className="flex flex-col gap-5 md:flex-row">
+      <form
+        method="POST"
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="space-y-8"
+      >
+        <div className="flex flex-col md:flex-row gap-5">
           {/* Name */}
           <FormField
             control={form.control}
@@ -97,7 +115,10 @@ const ProductForm = ({
             render={({
               field,
             }: {
-              field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "name">;
+              field: ControllerRenderProps<
+                z.infer<typeof insertProductSchema>,
+                "name"
+              >;
             }) => (
               <FormItem className="w-full">
                 <FormLabel>Name</FormLabel>
@@ -115,22 +136,28 @@ const ProductForm = ({
             render={({
               field,
             }: {
-              field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "slug">;
+              field: ControllerRenderProps<
+                z.infer<typeof insertProductSchema>,
+                "slug"
+              >;
             }) => (
               <FormItem className="w-full">
                 <FormLabel>Slug</FormLabel>
                 <FormControl>
                   <div className="relative">
-                    <Input placeholder="Enter product slug" className="pl-8" {...field} />
-                    <button
+                    <Input placeholder="Enter slug" {...field} />
+                    <Button
                       type="button"
-                      className="bg-gray-500 text-white px-4 py-1 mt-2 hover:bg-gray-600"
+                      className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 mt-2"
                       onClick={() => {
-                        form.setValue("slug", slugify(form.getValues("name"), { lower: true }));
+                        form.setValue(
+                          "slug",
+                          slugify(form.getValues("name"), { lower: true }),
+                        );
                       }}
                     >
                       Generate
-                    </button>
+                    </Button>
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -138,7 +165,7 @@ const ProductForm = ({
             )}
           />
         </div>
-        <div className="flex flex-col gap-5 md:flex-row">
+        <div className="flex flex-col md:flex-row gap-5">
           {/* Category */}
           <FormField
             control={form.control}
@@ -146,7 +173,10 @@ const ProductForm = ({
             render={({
               field,
             }: {
-              field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "category">;
+              field: ControllerRenderProps<
+                z.infer<typeof insertProductSchema>,
+                "category"
+              >;
             }) => (
               <FormItem className="w-full">
                 <FormLabel>Category</FormLabel>
@@ -164,19 +194,22 @@ const ProductForm = ({
             render={({
               field,
             }: {
-              field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "brand">;
+              field: ControllerRenderProps<
+                z.infer<typeof insertProductSchema>,
+                "brand"
+              >;
             }) => (
               <FormItem className="w-full">
                 <FormLabel>Brand</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter product brand" {...field} />
+                  <Input placeholder="Enter brand" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-        <div className="flex flex-col gap-5 md:flex-row">
+        <div className="flex flex-col md:flex-row gap-5">
           {/* Price */}
           <FormField
             control={form.control}
@@ -184,7 +217,10 @@ const ProductForm = ({
             render={({
               field,
             }: {
-              field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "price">;
+              field: ControllerRenderProps<
+                z.infer<typeof insertProductSchema>,
+                "price"
+              >;
             }) => (
               <FormItem className="w-full">
                 <FormLabel>Price</FormLabel>
@@ -202,19 +238,22 @@ const ProductForm = ({
             render={({
               field,
             }: {
-              field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "stock">;
+              field: ControllerRenderProps<
+                z.infer<typeof insertProductSchema>,
+                "stock"
+              >;
             }) => (
               <FormItem className="w-full">
                 <FormLabel>Stock</FormLabel>
                 <FormControl>
-                  <Input type="number" placeholder="Enter product stock" {...field} />
+                  <Input placeholder="Enter stock" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-        <div className="upload-field flex flex-col gap-5 md:flex-row">
+        <div className="upload-field flex flex-col md:flex-row gap-5">
           {/* Images */}
           <FormField
             control={form.control}
@@ -258,17 +297,20 @@ const ProductForm = ({
           />
         </div>
         <div className="upload-field">
-          {/* Is Featured */}
+          {/* isFeatured */}
           Featured Product
           <Card>
-            <CardContent className="space-y-2 mt-2  ">
+            <CardContent className="space-y-2 mt-2">
               <FormField
                 control={form.control}
                 name="isFeatured"
                 render={({ field }) => (
                   <FormItem className="space-x-2 items-center">
                     <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
                     </FormControl>
                     <FormLabel>Is Featured?</FormLabel>
                   </FormItem>
@@ -278,11 +320,12 @@ const ProductForm = ({
                 <Image
                   src={banner}
                   alt="banner image"
-                  className=" w-full object-cover object-center rounded-sm"
+                  className="w-full object-cover object-center rounded-sm"
                   width={1920}
                   height={680}
                 />
               )}
+
               {isFeatured && !banner && (
                 <UploadButton
                   endpoint="imageUploader"
@@ -308,7 +351,10 @@ const ProductForm = ({
             render={({
               field,
             }: {
-              field: ControllerRenderProps<z.infer<typeof insertProductSchema>, "description">;
+              field: ControllerRenderProps<
+                z.infer<typeof insertProductSchema>,
+                "description"
+              >;
             }) => (
               <FormItem className="w-full">
                 <FormLabel>Description</FormLabel>
@@ -325,7 +371,6 @@ const ProductForm = ({
           />
         </div>
         <div>
-          {/* Submit */}
           <Button
             type="submit"
             size="lg"
