@@ -5,10 +5,14 @@ import { Button } from "./ui/button";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-// Static target date (replace with desired date)
-const TARGET_DATE = new Date("2024-12-20T00:00:00");
+// Target: midnight at the start of the next month. The deal renews monthly,
+// so the countdown never expires. Recomputed each tick to survive a rollover.
+const getTargetDate = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+};
 
-// Function to calculate time remaining
+// Function to calculate the time remaining
 const calculateTimeRemaining = (targetDate: Date) => {
   const currentTime = new Date();
   const timeDifference = Math.max(Number(targetDate) - Number(currentTime), 0);
@@ -27,10 +31,10 @@ const DealCountdown = () => {
 
   useEffect(() => {
     // Calculate initial time remaining on the client
-    setTime(calculateTimeRemaining(TARGET_DATE));
+    setTime(calculateTimeRemaining(getTargetDate()));
 
     const timerInterval = setInterval(() => {
-      const newTime = calculateTimeRemaining(TARGET_DATE);
+      const newTime = calculateTimeRemaining(getTargetDate());
       setTime(newTime);
 
       // Clear when countdown is over
@@ -47,7 +51,6 @@ const DealCountdown = () => {
     return () => clearInterval(timerInterval);
   }, []);
 
-  // Render a loading state during hydration
   if (!time) {
     return (
       <section className="grid grid-cols-1 md:grid-cols-2 my-20">
@@ -58,7 +61,6 @@ const DealCountdown = () => {
     );
   }
 
-  // If the countdown is over, display fallback UI
   if (
     time.days === 0 &&
     time.hours === 0 &&
@@ -72,6 +74,7 @@ const DealCountdown = () => {
           <p>
             This deal is no longer available. Check out our latest promotions!
           </p>
+
           <div className="text-center">
             <Button asChild>
               <Link href="/search">View Products</Link>
