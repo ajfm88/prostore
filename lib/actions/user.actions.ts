@@ -214,7 +214,11 @@ export async function getAllUsers({
     skip: (page - 1) * limit,
   });
 
-  const dataCount = await prisma.user.count();
+  const dataCount = await prisma.user.count({
+    where: {
+      ...queryFilter,
+    },
+  });
 
   return {
     data,

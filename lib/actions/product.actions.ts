@@ -91,7 +91,14 @@ export async function getAllProducts({
     take: limit,
   });
 
-  const dataCount = await prisma.product.count();
+  const dataCount = await prisma.product.count({
+    where: {
+      ...queryFilter,
+      ...categoryFilter,
+      ...ratingFilter,
+      ...priceFilter,
+    },
+  });
 
   return {
     data,
