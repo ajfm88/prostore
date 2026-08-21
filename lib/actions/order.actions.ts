@@ -8,6 +8,7 @@ import { getUserById } from "./user.actions";
 import { insertOrderSchema } from "../validators";
 import { prisma } from "@/db/prisma";
 import { Prisma } from "@/lib/generated/prisma";
+import { requireAdmin } from "../auth-guard";
 import { CartItem, PaymentResult, ShippingAddress } from "@/types";
 import { convertToPlainObject } from "../utils";
 import { revalidatePath } from "next/cache";
@@ -392,6 +393,8 @@ export async function getAllOrders({
 // Delete Order
 export async function deleteOrder(id: string) {
   try {
+    await requireAdmin();
+
     await prisma.order.delete({ where: { id } });
 
     revalidatePath("/admin/orders");
@@ -408,6 +411,8 @@ export async function deleteOrder(id: string) {
 // Update COD order to paid
 export async function updateOrderToPaidByCOD(orderId: string) {
   try {
+    await requireAdmin();
+
     await updateOrderToPaid({ orderId });
     revalidatePath(`/order/${orderId}`);
     return { success: true, message: "Order paid successfully" };
@@ -419,6 +424,8 @@ export async function updateOrderToPaidByCOD(orderId: string) {
 // Update Order To Delivered
 export async function deliverOrder(orderId: string) {
   try {
+    await requireAdmin();
+
     const order = await prisma.order.findFirst({
       where: {
         id: orderId,

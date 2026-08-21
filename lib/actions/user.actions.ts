@@ -8,6 +8,7 @@ import {
   updateUserSchema,
 } from "../validators";
 import { auth, signIn, signOut } from "@/auth";
+import { requireAdmin } from "../auth-guard";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { hash } from "../encrypt";
 import { prisma } from "@/db/prisma";
@@ -229,6 +230,8 @@ export async function getAllUsers({
 // Delete a user
 export async function deleteUser(id: string) {
   try {
+    await requireAdmin();
+
     await prisma.user.delete({ where: { id } });
 
     revalidatePath("/admin/users");
@@ -248,6 +251,8 @@ export async function deleteUser(id: string) {
 // Update a user
 export async function updateUser(user: z.infer<typeof updateUserSchema>) {
   try {
+    await requireAdmin();
+
     await prisma.user.update({
       where: { id: user.id },
       data: {

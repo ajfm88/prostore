@@ -28,7 +28,11 @@ const SignIn = async (props: {
   const session = await auth();
 
   if (session) {
-    return redirect(callbackUrl || "/");
+    const safeUrl =
+      callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
+        ? callbackUrl
+        : "/";
+    return redirect(safeUrl);
   }
 
   return (
