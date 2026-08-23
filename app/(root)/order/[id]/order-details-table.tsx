@@ -1,5 +1,4 @@
 "use client";
-
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -11,23 +10,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDateTime, formatId } from "@/lib/utils";
 import { Order } from "@/types";
-import Image from "next/image";
 import Link from "next/link";
+import Image from "next/image";
+import { useToast } from "@/hooks/use-toast";
+import { useTransition } from "react";
 import {
   PayPalButtons,
   PayPalScriptProvider,
   usePayPalScriptReducer,
 } from "@paypal/react-paypal-js";
 import {
-  approvePayPalOrder,
   createPayPalOrder,
-  deliverOrder,
+  approvePayPalOrder,
   updateOrderToPaidByCOD,
+  deliverOrder,
 } from "@/lib/actions/order.actions";
-import { useTransition } from "react";
 import StripePayment from "./stripe-payment";
 
 const OrderDetailsTable = ({
@@ -36,7 +35,7 @@ const OrderDetailsTable = ({
   isAdmin,
   stripeClientSecret,
 }: {
-  order: Omit<Order, 'paymentResult'>;
+  order: Omit<Order, "paymentResult">;
   paypalClientId: string;
   isAdmin: boolean;
   stripeClientSecret: string | null;
@@ -72,11 +71,13 @@ const OrderDetailsTable = ({
   // Creates a PayPal order
   const handleCreatePayPalOrder = async () => {
     const res = await createPayPalOrder(order.id);
-    if (!res.success)
-      return toast({
+    if (!res.success) {
+      toast({
         description: res.message,
         variant: "destructive",
       });
+      throw new Error(res.message);
+    }
     return res.data;
   };
 
