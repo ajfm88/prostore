@@ -174,6 +174,7 @@ export async function updateProfile(user: { name: string; email: string }) {
       },
       data: {
         name: user.name,
+        email: user.email,
       },
     });
 

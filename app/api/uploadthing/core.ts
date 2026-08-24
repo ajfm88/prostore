@@ -9,7 +9,8 @@ export const ourFileRouter = {
     .middleware(async () => {
       const session = await auth();
 
-      if (!session) throw new UploadThingError("Unauthorized");
+      if (!session || session.user.role !== "admin")
+        throw new UploadThingError("Unauthorized");
 
       return { userId: session?.user.id };
     })

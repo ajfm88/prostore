@@ -6,9 +6,9 @@ import sampleData from "@/db/sample-data";
 import { hash } from "@/lib/encrypt";
 
 const { Pool } = pg;
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function main() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });
 
@@ -31,4 +31,9 @@ async function main() {
   console.log("Database seeded successfully");
 }
 
-main();
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  })
+  .finally(() => pool.end());
