@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   title: "Place Order",
 };
 
-const placeOrderPage = async () => {
+const PlaceOrderPage = async () => {
   const cart = await getMyCart();
   const session = await auth();
   const userId = session?.user?.id;
@@ -139,4 +139,4 @@ const placeOrderPage = async () => {
   );
 };
 
-export default placeOrderPage;
+export default PlaceOrderPage;
