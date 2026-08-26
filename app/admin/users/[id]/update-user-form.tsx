@@ -138,7 +138,7 @@ const UpdateUserForm = ({
                 "role"
               >;
             }) => (
-              <FormItem className=" items-center">
+              <FormItem className="w-full">
                 <FormLabel>Role</FormLabel>
                 <Select
                   onValueChange={field.onChange}

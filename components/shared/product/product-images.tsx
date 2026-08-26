@@ -4,14 +4,14 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
-const ProductImages = ({ images }: { images: string[] }) => {
+const ProductImages = ({ images, name }: { images: string[]; name: string }) => {
   const [current, setCurrent] = useState(0);
 
   return (
     <div className="space-y-4">
       <Image
         src={images![current]}
-        alt="hero image"
+        alt={name}
         width={1000}
         height={1000}
         className="min-h-[300px] object-cover object-center "
@@ -26,7 +26,7 @@ const ProductImages = ({ images }: { images: string[] }) => {
             )}
             onClick={() => setCurrent(index)}
           >
-            <Image src={image} alt={"image"} width={100} height={100} />
+            <Image src={image} alt={name} width={100} height={100} />
           </div>
         ))}
       </div>
