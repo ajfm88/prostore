@@ -65,7 +65,7 @@ export const addItemToCart = async (data: z.infer<typeof cartItemSchema>) => {
 
       return {
         success: true,
-        message: "Item added to cart successfully",
+        message: `${product.name} added to cart successfully`,
       };
     } else {
       // Check for existing item in cart
