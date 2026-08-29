@@ -7,6 +7,12 @@ import { requireAdmin } from "../auth-guard";
 import { LATEST_PRODUCTS_LIMIT, PAGE_SIZE } from "../constants";
 import { revalidatePath } from "next/cache";
 import { insertProductSchema, updateProductSchema } from "../validators";
+import {
+  AI_MODEL,
+  getOpenAI,
+  GENERATE_DESCRIPTION_SYSTEM_PROMPT,
+  REPHRASE_TITLE_SYSTEM_PROMPT,
+} from "../ai";
 
 // Get the latest products
 export async function getLatestProducts() {
@@ -204,4 +210,73 @@ export async function getFeaturedProducts() {
   });
 
   return convertToPlainObject(data);
+}
+
+// Rephrase a product name into a cleaner, shoppable title (admin, OpenAI)
+export async function improveProductName(input: {
+  name: string;
+  category?: string;
+  brand?: string;
+}) {
+  try {
+    await requireAdmin();
+
+    if (!input.name || input.name.trim().length < 3) {
+      throw new Error("Enter a product name first");
+    }
+
+    const completion = await getOpenAI().chat.completions.create({
+      model: AI_MODEL,
+      temperature: 0.7,
+      messages: [
+        { role: "system", content: REPHRASE_TITLE_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `Name: ${input.name}\nCategory: ${input.category ?? ""}\nBrand: ${input.brand ?? ""}`,
+        },
+      ],
+    });
+
+    const text = completion.choices[0]?.message?.content?.trim();
+    if (!text) throw new Error("No name was generated");
+
+    return { success: true as const, text };
+  } catch (error) {
+    return { success: false as const, message: formatError(error) };
+  }
+}
+
+// Generate a product description from the current fields (admin, OpenAI)
+export async function generateProductDescription(input: {
+  name: string;
+  category?: string;
+  brand?: string;
+  description?: string;
+}) {
+  try {
+    await requireAdmin();
+
+    if (!input.name || input.name.trim().length < 3) {
+      throw new Error("Enter a product name first");
+    }
+
+    const completion = await getOpenAI().chat.completions.create({
+      model: AI_MODEL,
+      temperature: 0.7,
+      messages: [
+        { role: "system", content: GENERATE_DESCRIPTION_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `Name: ${input.name}\nCategory: ${input.category ?? ""}\nBrand: ${input.brand ?? ""}\nExisting description: ${input.description ?? ""}`,
+        },
+      ],
+    });
+
+    const text = completion.choices[0]?.message?.content?.trim();
+    if (!text) throw new Error("No description was generated");
+
+    return { success: true as const, text };
+  } catch (error) {
+    return { success: false as const, message: formatError(error) };
+  }
 }

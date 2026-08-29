@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { productDefaultValues } from "@/lib/constants";
 import { insertProductSchema, updateProductSchema } from "@/lib/validators";
@@ -25,7 +27,12 @@ import slugify from "slugify";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { createProduct, updateProduct } from "@/lib/actions/product.actions";
+import {
+  createProduct,
+  updateProduct,
+  improveProductName,
+  generateProductDescription,
+} from "@/lib/actions/product.actions";
 import { UploadButton } from "@/lib/uploadthing";
 import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
@@ -100,6 +107,44 @@ const ProductForm = ({
   const isFeatured = form.watch("isFeatured");
   const banner = form.watch("banner");
 
+  const [isImprovingName, setIsImprovingName] = useState(false);
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+
+  // Rephrase the product name with AI
+  const handleImproveName = async () => {
+    setIsImprovingName(true);
+    const res = await improveProductName({
+      name: form.getValues("name"),
+      category: form.getValues("category"),
+      brand: form.getValues("brand"),
+    });
+    setIsImprovingName(false);
+
+    if (res.success) {
+      form.setValue("name", res.text, { shouldValidate: true });
+    } else {
+      toast({ variant: "destructive", description: res.message });
+    }
+  };
+
+  // Generate the product description with AI
+  const handleGenerateDescription = async () => {
+    setIsGeneratingDesc(true);
+    const res = await generateProductDescription({
+      name: form.getValues("name"),
+      category: form.getValues("category"),
+      brand: form.getValues("brand"),
+      description: form.getValues("description"),
+    });
+    setIsGeneratingDesc(false);
+
+    if (res.success) {
+      form.setValue("description", res.text, { shouldValidate: true });
+    } else {
+      toast({ variant: "destructive", description: res.message });
+    }
+  };
+
   return (
     <Form {...form}>
       <form
@@ -125,6 +170,15 @@ const ProductForm = ({
                 <FormControl>
                   <Input placeholder="Enter product name" {...field} />
                 </FormControl>
+                <Button
+                  type="button"
+                  disabled={isImprovingName}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 mt-2"
+                  onClick={handleImproveName}
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  {isImprovingName ? "Improving..." : "Improve with AI"}
+                </Button>
                 <FormMessage />
               </FormItem>
             )}
@@ -365,6 +419,15 @@ const ProductForm = ({
                     {...field}
                   />
                 </FormControl>
+                <Button
+                  type="button"
+                  disabled={isGeneratingDesc}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 mt-2"
+                  onClick={handleGenerateDescription}
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  {isGeneratingDesc ? "Generating..." : "Generate with AI"}
+                </Button>
                 <FormMessage />
               </FormItem>
             )}
