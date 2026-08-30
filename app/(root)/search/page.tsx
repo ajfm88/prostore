@@ -5,6 +5,7 @@ import {
   getAllCategories,
   getAllProducts,
 } from "@/lib/actions/product.actions";
+import { getWishlistProductIds } from "@/lib/actions/wishlist.actions";
 import Link from "next/link";
 
 const prices = [
@@ -122,6 +123,7 @@ const SearchPage = async (props: {
   });
 
   const categories = await getAllCategories();
+  const wishlistIds = await getWishlistProductIds();
 
   return (
     <div className="grid md:grid-cols-5 md:gap-5">
@@ -236,7 +238,11 @@ const SearchPage = async (props: {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {products!.data.length === 0 && <div>No product found</div>}
           {products!.data.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard
+              key={product.id}
+              product={product}
+              wishlistIds={wishlistIds}
+            />
           ))}
         </div>
         {products!.totalPages! > 1 && (

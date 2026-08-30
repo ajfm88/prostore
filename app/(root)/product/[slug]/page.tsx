@@ -6,9 +6,11 @@ import ProductPrice from "@/components/shared/product/product-price";
 import ProductImages from "@/components/shared/product/product-images";
 import AddToCart from "@/components/shared/product/add-to-cart";
 import { getMyCart } from "@/lib/actions/cart.actions";
+import { getWishlistProductIds } from "@/lib/actions/wishlist.actions";
 import ReviewList from "./review-list";
 import { auth } from "@/auth";
 import Rating from "@/components/shared/product/rating";
+import WishlistButton from "@/components/shared/product/wishlist-button";
 
 const ProductDetailsPage = async (props: {
   params: Promise<{ slug: string }>;
@@ -22,6 +24,7 @@ const ProductDetailsPage = async (props: {
   const userId = session?.user?.id;
 
   const cart = await getMyCart();
+  const wishlistIds = await getWishlistProductIds();
 
   return (
     <>
@@ -37,7 +40,13 @@ const ProductDetailsPage = async (props: {
               <p>
                 {product.brand} {product.category}
               </p>
-              <h1 className="h3-bold">{product.name}</h1>
+              <div className="flex items-center justify-between gap-3">
+                <h1 className="h3-bold">{product.name}</h1>
+                <WishlistButton
+                  productId={product.id}
+                  initialIsInWishlist={wishlistIds.includes(product.id)}
+                />
+              </div>
               <Rating value={Number(product.rating)} />
               <p>{product.numReviews} reviews</p>
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">

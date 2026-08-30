@@ -5,10 +5,12 @@ const ProductList = ({
   data,
   title,
   limit,
+  wishlistIds,
 }: {
   data: Product[];
   title?: string;
   limit?: number;
+  wishlistIds?: string[];
 }) => {
   // Apply limit if provided, otherwise show all products
   const limitedData = limit ? data.slice(0, limit) : data;
@@ -19,7 +21,11 @@ const ProductList = ({
       {limitedData.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {limitedData.map((product: Product) => (
-            <ProductCard key={product.slug} product={product} />
+            <ProductCard
+              key={product.slug}
+              product={product}
+              wishlistIds={wishlistIds}
+            />
           ))}
         </div>
       ) : (

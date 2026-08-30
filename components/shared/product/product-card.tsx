@@ -4,11 +4,18 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import ProductPrice from "./product-price";
 import { Product } from "@/types";
 import Rating from "./rating";
+import WishlistButton from "./wishlist-button";
 
-const ProductCard = ({ product }: { product: Product }) => {
+const ProductCard = ({
+  product,
+  wishlistIds,
+}: {
+  product: Product;
+  wishlistIds?: string[];
+}) => {
   return (
     <Card className="w-full max-w-sm">
-      <CardHeader className="p-0 items-center">
+      <CardHeader className="p-0 items-center relative">
         <Link href={`/product/${product.slug}`}>
           <Image
             priority={true}
@@ -19,6 +26,11 @@ const ProductCard = ({ product }: { product: Product }) => {
             width={300}
           />
         </Link>
+        <WishlistButton
+          productId={product.id}
+          initialIsInWishlist={wishlistIds?.includes(product.id)}
+          className="absolute top-2 right-2 bg-background/80 backdrop-blur"
+        />
       </CardHeader>
       <CardContent className="p-4 grid gap-4">
         <div className="text-xs">{product.brand}</div>

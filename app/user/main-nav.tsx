@@ -14,6 +14,10 @@ const links = [
     title: "Orders",
     href: "/user/orders",
   },
+  {
+    title: "Wishlist",
+    href: "/user/wishlist",
+  },
 ];
 
 const MainNav = ({ className, ...props }: React.HTMLAttributes<HTMLElement>) => {

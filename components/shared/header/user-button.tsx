@@ -63,6 +63,11 @@ const UserButton = () => {
               Order History
             </Link>
           </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Link className="w-full" href="/user/wishlist">
+              Wishlist
+            </Link>
+          </DropdownMenuItem>
           {session.data?.user?.role === "admin" && (
             <DropdownMenuItem>
               <Link className="w-full" href="/admin/overview">
