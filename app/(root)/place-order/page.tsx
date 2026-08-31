@@ -126,6 +126,12 @@ const PlaceOrderPage = async () => {
                 <div>Shipping</div>
                 <div>{formatCurrency(cart.shippingPrice)}</div>
               </div>
+              {Number(cart.discountPrice) > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <div>Discount {cart.promoCode ? `(${cart.promoCode})` : ""}</div>
+                  <div>-{formatCurrency(cart.discountPrice)}</div>
+                </div>
+              )}
               <div className="flex justify-between">
                 <div>Total</div>
                 <div>{formatCurrency(cart.totalPrice)}</div>

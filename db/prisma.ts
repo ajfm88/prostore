@@ -54,6 +54,12 @@ function createPrismaClient() {
             return cart.taxPrice.toString();
           },
         },
+        discountPrice: {
+          needs: { discountPrice: true },
+          compute(cart) {
+            return cart.discountPrice.toString();
+          },
+        },
         totalPrice: {
           needs: { totalPrice: true },
           compute(cart) {
@@ -78,6 +84,12 @@ function createPrismaClient() {
           needs: { taxPrice: true },
           compute(cart) {
             return cart.taxPrice.toString();
+          },
+        },
+        discountPrice: {
+          needs: { discountPrice: true },
+          compute(cart) {
+            return cart.discountPrice.toString();
           },
         },
         totalPrice: {

@@ -57,10 +57,33 @@ export async function createOrder() {
       itemsPrice: cart.itemsPrice,
       shippingPrice: cart.shippingPrice,
       taxPrice: cart.taxPrice,
+      discountPrice: cart.discountPrice,
+      promoCode: cart.promoCode ?? null,
       totalPrice: cart.totalPrice,
     });
 
     const insertedOrderId = await prisma.$transaction(async (tx) => {
+      // Reserve the promo code atomically so a limited code cannot be oversold.
+      // The conditional update only decrements while the code is still active
+      // and has redemptions left; if it matches nothing, the order rolls back.
+      if (cart.promoCode) {
+        const now = new Date();
+        const reserved = await tx.promo.updateMany({
+          where: {
+            code: cart.promoCode,
+            count: { gt: 0 },
+            startsAt: { lte: now },
+            endsAt: { gte: now },
+          },
+          data: { count: { decrement: 1 } },
+        });
+        if (reserved.count === 0) {
+          throw new Error(
+            "Your promo code is no longer valid. Please remove it and try again.",
+          );
+        }
+      }
+
       const insertedOrder = await tx.order.create({ data: order });
       for (const item of cart.items as CartItem[]) {
         await tx.orderItem.create({
@@ -78,6 +101,8 @@ export async function createOrder() {
           totalPrice: 0,
           shippingPrice: 0,
           taxPrice: 0,
+          discountPrice: 0,
+          promoCode: null,
           itemsPrice: 0,
         },
       });

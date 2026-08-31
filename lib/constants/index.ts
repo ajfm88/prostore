@@ -61,4 +61,13 @@ export const reviewFormDefaultValues = {
   rating: 0,
 };
 
+export const promoDefaultValues = {
+  code: "",
+  percentage: 10,
+  count: 100,
+  minimumOrderValue: "0",
+  startsAt: "",
+  endsAt: "",
+};
+
 export const SENDER_EMAIL = process.env.SENDER_EMAIL || "onboarding@resend.dev";

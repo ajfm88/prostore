@@ -65,6 +65,8 @@ export const insertCartSchema = z.object({
   totalPrice: currency,
   shippingPrice: currency,
   taxPrice: currency,
+  discountPrice: currency,
+  promoCode: z.string().nullable().optional(),
   sessionCartId: z.string().min(1, "Session cart id is required"),
   userId: z.string().optional().nullable(),
 });
@@ -96,6 +98,8 @@ export const insertOrderSchema = z.object({
   itemsPrice: currency,
   shippingPrice: currency,
   taxPrice: currency,
+  discountPrice: currency,
+  promoCode: z.string().nullable().optional(),
   totalPrice: currency,
   paymentMethod: z.string().refine((data) => PAYMENT_METHODS.includes(data), {
     message: "Invalid payment method",
@@ -145,3 +149,35 @@ export const insertReviewSchema = z.object({
     .min(1, "Rating must be at least 1")
     .max(5, "Rating must be at most 5"),
 });
+
+// Promo / discount codes — shared fields
+const promoBaseSchema = z.object({
+  code: z.string().min(3, "Code must be at least 3 characters"),
+  percentage: z.coerce
+    .number()
+    .int()
+    .min(1, "Percentage must be at least 1")
+    .max(100, "Percentage must be at most 100"),
+  count: z.coerce.number().int().min(0, "Count cannot be negative"),
+  minimumOrderValue: currency,
+  startsAt: z.string().min(1, "Start date is required"),
+  endsAt: z.string().min(1, "End date is required"),
+});
+
+// End date must come after the start date
+const endAfterStart = (data: { startsAt: string; endsAt: string }) =>
+  new Date(data.endsAt) > new Date(data.startsAt);
+
+// Schema for creating a promo code
+export const insertPromoSchema = promoBaseSchema.refine(endAfterStart, {
+  message: "End date must be after the start date",
+  path: ["endsAt"],
+});
+
+// Schema for updating a promo code
+export const updatePromoSchema = promoBaseSchema
+  .extend({ id: z.string().min(1, "Id is required") })
+  .refine(endAfterStart, {
+    message: "End date must be after the start date",
+    path: ["endsAt"],
+  });

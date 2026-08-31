@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
+import PromoForm from "./promo-form";
 
 function AddButton({ item }: { item: CartItem }) {
   const { toast } = useToast();
@@ -138,6 +139,18 @@ const CartTable = ({ cart }: { cart?: Cart }) => {
                   {formatCurrency(cart.itemsPrice)}
                 </span>
               </div>
+              <div className="pb-3">
+                <PromoForm
+                  promoCode={cart.promoCode}
+                  discountPrice={cart.discountPrice}
+                />
+              </div>
+              {Number(cart.discountPrice) > 0 && (
+                <div className="flex justify-between pb-3 text-green-600">
+                  <span>Discount</span>
+                  <span>-{formatCurrency(cart.discountPrice)}</span>
+                </div>
+              )}
               <Button
                 className="w-full"
                 disabled={isPending}

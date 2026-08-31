@@ -37,6 +37,7 @@ PurchaseReceiptEmail.PreviewProps = {
     totalPrice: "100",
     taxPrice: "10",
     shippingPrice: "10",
+    discountPrice: "0",
     itemsPrice: "80",
     orderitems: sampleData.products.map((x) => ({
       name: x.name,

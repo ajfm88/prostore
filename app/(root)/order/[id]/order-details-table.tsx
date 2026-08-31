@@ -46,6 +46,8 @@ const OrderDetailsTable = ({
     itemsPrice,
     taxPrice,
     shippingPrice,
+    discountPrice,
+    promoCode,
     totalPrice,
     paymentMethod,
     isPaid,
@@ -228,6 +230,12 @@ const OrderDetailsTable = ({
                 <div>Shipping</div>
                 <div>{formatCurrency(shippingPrice)}</div>
               </div>
+              {Number(discountPrice) > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <div>Discount {promoCode ? `(${promoCode})` : ""}</div>
+                  <div>-{formatCurrency(discountPrice)}</div>
+                </div>
+              )}
               <div className="flex justify-between">
                 <div>Total</div>
                 <div>{formatCurrency(totalPrice)}</div>
