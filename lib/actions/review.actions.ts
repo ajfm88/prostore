@@ -28,6 +28,20 @@ export async function createUpdateReview(
 
     if (!product) throw new Error("Product not found");
 
+    // Gate reviews on an actual paid purchase of this product.
+    // This is also what makes the `isVerifiedPurchase` flag honest.
+    const hasPurchased = await prisma.order.findFirst({
+      where: {
+        userId: review.userId,
+        isPaid: true,
+        orderitems: { some: { productId: review.productId } },
+      },
+      select: { id: true },
+    });
+
+    if (!hasPurchased)
+      throw new Error("You can only review products you have purchased");
+
     // Check if user has already reviewed this product
     const reviewExists = await prisma.review.findFirst({
       where: {

@@ -92,7 +92,12 @@ const config: Config = {
   // ],
 
   // A map from regular expressions to module names or to arrays of module names that allow to stub out resources with a single module
-  // moduleNameMapper: {},
+  moduleNameMapper: {
+    // Resolve the "@/..." path alias (mirrors tsconfig paths) for tests
+    "^@/(.*)$": "<rootDir>/$1",
+    // query-string is ESM-only and unused by the code under test — stub it
+    "^query-string$": "<rootDir>/tests/query-string.stub.ts",
+  },
 
   // An array of regexp pattern strings, matched against all module paths before considered 'visible' to the module loader
   // modulePathIgnorePatterns: [],
